@@ -1,288 +1,962 @@
-<!DOCTYPE HTML> 
-<html> 
-
-<script src="unit teapot.js"></script>
-
-<script src="gl-matrix-min.js"></script>
-
-<script>
-var gl;
-var shaderProgram;
-var modelview_uniform;
-var normal_uniform;
-var projection_uniform;
-var texture, texture2;
-var sampler_uniform;
-var sampler2_uniform;
-var teapot_vao;
-var vert_pos_attr;
-var vert_normal_attr;
-
-//
-// a default vertex shader implemented as a backquoted string variable
-//
-
-var vs = `#version 300 es
-
-in vec3 aVertexPosition;
-in vec3 aVertexNormal;
-in vec2 aTexCoord;
-
-uniform mat4 uModelViewMatrix;
-uniform mat3 uNormalMatrix;
-uniform mat4 uProjectionMatrix;
-
-out vec2 vTexCoord;
-out vec3 vNormal;
-
-void main() {
-  vTexCoord.s = aVertexPosition.x + 0.5;
-  vTexCoord.t = aVertexPosition.y + 0.5;
-
-  gl_Position = uProjectionMatrix*uModelViewMatrix*vec4(aVertexPosition, 1.0);
-}
-`;
-
-//
-// a default fragment shader implemented as a backquoted string variable
-//
-
-var fs = `#version 300 es
-
-precision mediump float;
-    
-in vec3 vNormal;
-in vec2 vTexCoord;
-uniform sampler2D uSampler;
-uniform sampler2D uSampler2;
-
-out vec4 outColor;
-    
-void main() {
-  vec3 illinois = vec3(texture(uSampler, vTexCoord));
-  vec3 stadium = vec3(texture(uSampler2, vTexCoord));
-  vec3 c = 0.5*illinois + 0.5*stadium;
-
-  outColor = vec4(c,1.0);
-}
-`;
-
-
-
-function initwebgl() {
-
-  //
-  // create a graphics context
-  //
-
-  var canvas = document.getElementById("myGLCanvas");
-  gl = canvas.getContext("webgl2");
-  if (!gl)
-    alert("Failed to create WebGL context!");
-
-  gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
-
-  loadshaders(vs,fs);
-
-  // set up vertex array object
- 
-  teapot_vao = gl.createVertexArray();
-  gl.bindVertexArray(teapot_vao);
-
-  // create a coordinate buffer of vertex positions and
-  // connect it to the vertex shader positions
- 
-  gl.bindBuffer(gl.ARRAY_BUFFER, gl.createBuffer());
-  gl.bufferData(gl.ARRAY_BUFFER,
-                new Float32Array(teapot.positions),
-                gl.STATIC_DRAW);
-
-  gl.enableVertexAttribArray(vert_pos_attr);
-  gl.vertexAttribPointer(vert_pos_attr, 3, gl.FLOAT, false, 0, 0);
-
-  // create a coordinate buffer of vertex positions and
-  // connect it to the vertex shader positions
-  // but normalize the normals first
-
-  var x,y,z,d,i;
-  for (i = 0; i < teapot.normals.length; i += 3) {
-    x = teapot.normals[i];
-    y = teapot.normals[i+1];
-    z = teapot.normals[i+2];
-
-    d = 1.0/Math.sqrt(x*x + y*y + z*z);
-
-    teapot.normals[i] *= d;
-    teapot.normals[i+1] *= d;
-    teapot.normals[i+2] *= d;
-    
-  }
-
-  gl.bindBuffer(gl.ARRAY_BUFFER, gl.createBuffer());
-  gl.bufferData(gl.ARRAY_BUFFER,
-                new Float32Array(teapot.normals),
-                gl.STATIC_DRAW);
-
-  gl.enableVertexAttribArray(vert_normal_attr);
-  gl.vertexAttribPointer(vert_normal_attr, 3, gl.FLOAT, false, 0, 0);
-
-  // create an index buffer of triangle faces
-
-  gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, gl.createBuffer()); 
-  gl.bufferData(gl.ELEMENT_ARRAY_BUFFER,
-                new Uint16Array(teapot.faces),
-                gl.STATIC_DRAW);
-
-  //
-  // set up texture and sampler
-  //
-
-  texture = gl.createTexture();
-  gl.bindTexture(gl.TEXTURE_2D, texture);
-
-  var sampler = gl.createSampler();
-  gl.bindSampler(0, sampler);
-
-  //
-  // load texture image using webgl2fundamentals boilerplate
-  // initially creates just a 1x1 blue pixel as a placeholder
-  // replaced by actual texture image once loaded
-  //
-
-  gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 1, 1, 0, gl.RGBA,
-                gl.UNSIGNED_BYTE, new Uint8Array([0, 0, 255, 255]));
-
-  var image = new Image();
-  image.src = "illinois512.png";
-
-  image.addEventListener("load", function() {
-    gl.bindTexture(gl.TEXTURE_2D, texture);
-    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 512, 512, 0, gl.RGBA, gl.UNSIGNED_BYTE, image);
-    gl.generateMipmap(gl.TEXTURE_2D);
-  });
-
-  //
-  // set up second texture and sampler
-  //
-
-  texture2 = gl.createTexture();
-  gl.bindTexture(gl.TEXTURE_2D, texture2);
-
-  var sampler2 = gl.createSampler();
-  gl.bindSampler(1, sampler2);
-
-  //
-  // load texture image using webgl2fundamentals boilerplate
-  // initially creates just a 1x1 blue pixel as a placeholder
-  // replaced by actual texture image once loaded
-  //
-
-  gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 1, 1, 0, gl.RGBA,
-                gl.UNSIGNED_BYTE, new Uint8Array([0, 0, 255, 255]));
-
-  var image2 = new Image();
-  image2.src = "stadium sphere.jpg";
-
-  image2.addEventListener("load", function() {
-    gl.bindTexture(gl.TEXTURE_2D, texture2);
-    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 256, 256, 0, gl.RGBA, gl.UNSIGNED_BYTE, image2);
-    gl.generateMipmap(gl.TEXTURE_2D);
-  });
-
-  //
-  // set up transformation matrices
-  //
-
-  projection = glMatrix.mat4.create();
-  glMatrix.mat4.perspective(projection, Math.PI/6, 1.0, 0.1);
-
-  requestAnimationFrame(draw);
-}
-
-function loadshaders(vertexShaderSource,fragmentShaderSource) {
-  var vstextbox = document.getElementById("vertexshader");
-
-  var vertexShader = gl.createShader(gl.VERTEX_SHADER);
-  gl.shaderSource(vertexShader, vertexShaderSource);
-  gl.compileShader(vertexShader);
-  if (!gl.getShaderParameter(vertexShader, gl.COMPILE_STATUS))
-    alert("Vertex Shader Error:\n" + gl.getShaderInfoLog(vertexShader));
-
-  var fstextbox = document.getElementById("fragmentshader");
-
-  var fragmentShader = gl.createShader(gl.FRAGMENT_SHADER);
-  gl.shaderSource(fragmentShader, fragmentShaderSource);
-  gl.compileShader(fragmentShader);
-  if (!gl.getShaderParameter(fragmentShader, gl.COMPILE_STATUS))
-    alert("Fragment Shader Error:\n" + gl.getShaderInfoLog(fragmentShader));
-
-  //
-  // Compile shaders and get link ID's to the attributes and uniforms
-  //
-
-  shaderProgram = gl.createProgram();
-  gl.attachShader(shaderProgram, vertexShader);
-  gl.attachShader(shaderProgram, fragmentShader);
-  gl.linkProgram(shaderProgram);
-  if (!gl.getProgramParameter(shaderProgram, gl.LINK_STATUS))
-    alert("Failed to setup shaders");
-
-  vert_pos_attr = gl.getAttribLocation(shaderProgram, "aVertexPosition");
-  vert_normal_attr = gl.getAttribLocation(shaderProgram, "aVertexNormal");
-  modelview_uniform = gl.getUniformLocation(shaderProgram, "uModelViewMatrix"); 
-  normal_uniform = gl.getUniformLocation(shaderProgram, "uNormalMatrix"); 
-  projection_uniform = gl.getUniformLocation(shaderProgram, "uProjectionMatrix"); 
-  sampler_uniform = gl.getUniformLocation(shaderProgram, "uSampler"); 
-  sampler2_uniform = gl.getUniformLocation(shaderProgram, "uSampler2"); 
-}
-
-//
-// draw callback function that is passed to requestAnimationFrame()
-//
-
-function draw(time) {
-  gl.clearColor(0.075, 0.16, 0.294, 1.0);
-  gl.clearDepth(1.0);
-  gl.enable(gl.DEPTH_TEST);
-  gl.depthFunc(gl.LEQUAL);
-  gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
-
-  modelview = glMatrix.mat4.create();
-  glMatrix.mat4.translate(modelview,modelview,[0.0, 0.0, -2.0]);
-  glMatrix.mat4.rotateY(modelview,modelview, time*0.001);
-
-  normalmatrix = glMatrix.mat3.create();
-  glMatrix.mat3.normalFromMat4(normalmatrix,modelview);
-
-  gl.useProgram(shaderProgram);
-
-  gl.uniformMatrix4fv(modelview_uniform, false, modelview);
-  gl.uniformMatrix3fv(normal_uniform, false, normalmatrix);
-  gl.uniformMatrix4fv(projection_uniform, false, projection);
-
-  gl.uniform1i(sampler_uniform,0);
-  gl.uniform1i(sampler2_uniform,1);
-
-  gl.activeTexture(gl.TEXTURE0);
-  gl.bindTexture(gl.TEXTURE_2D, texture);
-  gl.activeTexture(gl.TEXTURE1);
-  gl.bindTexture(gl.TEXTURE_2D, texture2);
-
-  gl.bindVertexArray(teapot_vao);
-  gl.drawElements(gl.TRIANGLES,
-                  teapot.faces.length,
-                  gl.UNSIGNED_SHORT,
-                  0);
-
-  requestAnimationFrame(draw);
-}
-
-
-</script>
-
-<body onload="initwebgl()">
-
-<canvas id="myGLCanvas" width="500" height="500"></canvas>
-
+<!doctype html>
+<html lang="en">
+    <!-- Jake Kugel.
+
+         Draw a simple water molecule with shading.
+
+         Some HTML tips from https://www.sitepoint.com/a-basic-html5-template/.
+         Some WebGL examples from CS418 Interactive Computer Graphics by Prof. John Hart, UIUC.
+         Instancing example from https://webgl2fundamentals.org/webgl/lessons/webgl-instanced-drawing.html
+    -->
+
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>WebGL Molecule Example</title>
+    <meta name="description" content="Jake Kugel WebGL2 hello world.">
+    <meta name="author" content="Jake Kugel">
+
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+</head>
+<body onload="main();">
+    <canvas id="myCanvas" width="800" height="800"></canvas>
+
+    <!-- Load matric helper library. -->
+    <script src="gl-matrix-min.js"></script>
+
+    <!-- Load debugging script. -->
+    <script src="webgl-debug.js"></script>
+
+    <!-- Load Gregg Man Linter -->
+    <script src="https://greggman.github.io/webgl-lint/webgl-lint.js" crossorigin></script>
+
+    <script>
+        var lastKey;
+
+
+      window.onkeypress = function (event) {
+        console.log(event.keyCode)
+        lastKey = event.keyCode;
+      }
+
+      class SceneNode {
+          constructor() {
+              this.children = [];
+              this.modelTx = glMatrix.mat4.create();
+              this.parent = null;
+              this.size = 0.0;
+              this.color = "";
+              this.type = null;
+          }
+
+          traverse(type, process) {
+              // Recursively process nodes, each node represents one instance
+              const nodesToProcess = [this];
+              let nodeNum = 0;
+
+              // Traverse the tree and store updated modelview matrices into modelView array
+              while (nodesToProcess.length > 0) {
+
+                  // Remove first item from array
+                  const node = nodesToProcess[0];
+                  nodesToProcess.splice(0, 1);
+
+                  // Add children to nodesToProcess
+                  nodesToProcess.push(...node.getChildren());
+
+                  if (type === node.getType()) {
+                      process(node, nodeNum);
+                      nodeNum++;
+                  }
+
+              }
+          }
+
+          getTreeSize(type) {
+              let size;
+
+              if (this.type === type) {
+                size = 1;
+              } else {
+                size = 0;
+              }
+
+              for (let i = 0; i < this.children.length; i++) {
+                  size = size + this.children[i].getTreeSize(type);
+              }
+              return size;
+          }
+
+          setSize(size) {
+              this.size = size;
+          }
+
+          getSize() {
+              return this.size;
+          }
+
+          setType(type) {
+              this.type = type;
+          }
+
+          getType() {
+              return this.type;
+          }
+
+          setColorByName(color) {
+              if (color === "red") {
+                  this.color = [1.0, 0.0, 0.0, 1.0];
+              } else if (color === "white") {
+                  this.color = [1.0, 1.0, 1.0, 1.0];
+              } else if (color === "black") {
+                  this.color = [0.0, 0.0, 0.0, 1.0];
+              } else if (color === "grey") {
+                  this.color = [0.5, 0.5, 0.5, 1.0];
+              }
+          }
+
+          getColor() {
+              return this.color;
+          }
+
+          addChild(node) {
+              this.children.push(node);
+          }
+
+          getChildren() {
+              return this.children;
+          }
+
+          getAbsoluteModelTx() {
+              var node = this;
+              var model = glMatrix.mat4.create();
+              while (node != null) {
+                  glMatrix.mat4.mul(model, model, node.getModelTx());
+                  node = node.getParent();
+              }
+
+              return model;
+          }
+
+          setParent(parent) {
+              this.parent = parent;
+          }
+
+          getParent() {
+              return this.parent;
+          }
+
+          setModelTx(modelTx) {
+            this.modelTx = modelTx;
+          }
+
+          getModelTx() {
+            return this.modelTx;
+          }
+      }
+
+
+      function main() {
+        // Get canvas
+        const canvas = document.getElementById('myCanvas')
+
+        // canvas.width = window.innerWidth;
+        // canvas.height = window.innerHeight;
+        // canvasW = canvas.width;
+        // canvasH = canvas.height;
+
+        const gl = WebGLDebugUtils.makeDebugContext(canvas.getContext("webgl2"));
+
+        const ext = gl.getExtension('GMAN_debug_helper');
+        if (ext) {
+          ext.setConfiguration({
+            maxDrawCalls: 2000,
+            failUnsetSamplerUniforms: true,
+          });
+        }
+
+        var vertexShaderSource = `#version 300 es
+
+        // Per vertex attributes
+        in vec3 aVertexPosition;
+        in vec3 aVertexNormal;
+
+        // Per-instance attributes
+        in mat4 aModelViewMatrix;
+        in mat3 aNormalMatrix;
+        in vec4 aColor;
+
+        // Uniform attributes
+        uniform mat4 uProjectionMatrix;
+
+        out vec3 n,l,v;
+        out vec4 color;
+
+        void main() {
+            vec4 p = aModelViewMatrix * vec4(aVertexPosition, 1.0);
+
+            // Output vectors will be interpolated across fragments and passed in to fragment shader
+            n = normalize(aNormalMatrix * aVertexNormal);
+            l = normalize(vec3(2.0, 2.0, 2.0));
+            v = normalize(-p.xyz);
+
+            color = aColor;
+
+            gl_Position =  uProjectionMatrix * aModelViewMatrix * vec4(aVertexPosition, 1.0);
+        }
+        `;
+
+        // Create a fragment shader
+        var fragmentShaderSource = `#version 300 es
+          precision mediump float;
+
+          in vec3 n,l,v;
+          in vec4 color;
+          out vec4 outColor;
+
+          void main() {
+//              outColor = color;
+              vec3 nn = normalize(n);
+              vec3 ln = normalize(l);
+              vec3 vn = normalize(v);
+
+              // Ambient light coefficients
+              float kar = 0.4;
+              float kag = 0.4;
+              float kab = 0.4;
+
+              // Diffuse light coefficients
+              float kdr = 0.3;
+              float kdg = 0.3;
+              float kdb = 0.3;
+
+              // Specular light coefficients
+              float ksr = 0.3;
+              float ksg = 0.3;
+              float ksb = 0.3;
+
+              // n dot l / cosine theta for diffuse lighting
+              float diffuse = dot(nn, ln);
+              if (diffuse < 0.0) {
+                  diffuse = 0.0;
+              }
+
+              // Local reflection vector for specular lighting
+              vec3 r = 2.0 * dot(nn, ln) * nn - ln;
+
+              // Calculate dot(vn, r)
+              float vdotr = dot(vn, r);
+              if (vdotr < 0.0) {
+                  vdotr = 0.0;
+              }
+
+              // v dot r to the n / reflection for Phong specular lighting
+              float specular = pow(vdotr, 10.0);
+              if (specular < 0.0) {
+                  specular = 0.0;
+              }
+
+              // Calculate color components using ambient, Lambertian diffuse, and Phong specular models
+              float colorR = kar * color.r + kar * color.r * diffuse + ksr * specular;
+              float colorG = kag * color.g + kag * color.g * diffuse + ksg * specular;
+              float colorB = kab * color.b + kab * color.b * diffuse + ksb * specular;
+
+              outColor = vec4(colorR, colorG, colorB, 1.0);
+            }
+        `;
+
+        // Create the program
+        var shaderProgram = createProgram(gl, vertexShaderSource, fragmentShaderSource);
+
+        const vertexPositionAttribute = gl.getAttribLocation(shaderProgram, "aVertexPosition");
+        const modelViewAttribute = gl.getAttribLocation(shaderProgram, "aModelViewMatrix");
+        const normalAttribute = gl.getAttribLocation(shaderProgram, "aNormalMatrix");
+        const vertexColorAttribute = gl.getAttribLocation(shaderProgram, "aColor");
+        const vertexNormalAttribute = gl.getAttribLocation(shaderProgram, "aVertexNormal");
+        const projectionUniform = gl.getUniformLocation(shaderProgram, "uProjectionMatrix");
+
+        // Build the scene graph
+        const oxygen = getOxygenGraph();
+
+        // Get VAO containing atoms (aka spheres).
+        const numSphereInstances = oxygen.getTreeSize("atom");
+        const modelViewMatrices = new Float32Array(numSphereInstances * 16);
+        const normalMatrices = new Float32Array(numSphereInstances * 9);
+        const matrixBuffer = gl.createBuffer();
+        const normalBuffer = gl.createBuffer();
+        const sphereVertices = getUnitSphereCoords(1.0);
+        const sphereNormals = getUnitSphereCoords(1.0);
+        const sphereVao = getSphereVao();
+
+        // Get VAO containing bonds (aka sticks).
+        const numStickInstances = oxygen.getTreeSize("bond");
+        const stickModelViewMatrices = new Float32Array(numStickInstances * 16);
+        const stickNormalMatrices = new Float32Array(numStickInstances * 9);
+        const stickMatrixBuffer = gl.createBuffer();
+        const stickNormalBuffer = gl.createBuffer();
+        const stickVertices = getCylinder();
+        const stickNormals = getCylinderNormals();
+        const stickVao = getStickVao(gl);
+
+        // Build perspective transform.  This does not change.
+        var projection = glMatrix.mat4.create();
+        glMatrix.mat4.perspective(projection, Math.PI/4, 1.0, 0.1);
+
+        function draw(time) {
+            gl.useProgram(shaderProgram);
+
+            // Clear frame buffer for each frame.
+            gl.clearColor(0.0, 0.0, 0.0, 1.0);
+            gl.clearDepth(1.0);
+            gl.enable(gl.DEPTH_TEST);
+            gl.depthFunc(gl.LEQUAL);
+            gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+
+            // Build view transform, this changes each frame.
+            const viewTx = glMatrix.mat4.create();
+            glMatrix.mat4.translate(viewTx, viewTx, [0.0, 0.0, -20.0]);
+            glMatrix.mat4.rotateY(viewTx, viewTx, time * 0.001);
+            glMatrix.mat4.rotateX(viewTx, viewTx, time * 0.0005);
+            glMatrix.mat4.rotateZ(viewTx, viewTx, time * 0.0003);
+
+            // Redraw atoms (spheres)
+            gl.bindVertexArray(sphereVao);
+            updateSphereMatrices(oxygen, viewTx);
+            gl.uniformMatrix4fv(projectionUniform, false, projection);
+            gl.drawArraysInstanced(gl.TRIANGLES, 0, sphereVertices.length / 3, numSphereInstances);
+
+            // Redraw bonds (sticks)
+            gl.bindVertexArray(stickVao);
+            updateStickMatrices(oxygen, viewTx);
+            gl.uniformMatrix4fv(projectionUniform, false, projection);
+            gl.drawArraysInstanced(gl.TRIANGLES, 0, stickVertices.length / 3, numStickInstances);
+
+            requestAnimationFrame(draw);
+        }
+
+        requestAnimationFrame(draw);
+
+        function getSphereVao() {
+          // Create the VAO used for multiple ball instances
+          const vao = gl.createVertexArray();
+
+          gl.bindVertexArray(vao); // After binding vao, calls to bindBuffer() and vertexAttribPointer() are "recorded" in the vao.
+
+          // Store instance vertices
+          gl.bindBuffer(gl.ARRAY_BUFFER, gl.createBuffer());
+          gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(sphereVertices), gl.STATIC_DRAW);
+          gl.enableVertexAttribArray(vertexPositionAttribute);
+          gl.vertexAttribPointer(vertexPositionAttribute, 3, gl.FLOAT, false, 0, 0);
+
+          // Store instance normals
+          gl.bindBuffer(gl.ARRAY_BUFFER, gl.createBuffer());
+          gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(sphereNormals), gl.STATIC_DRAW);
+          gl.enableVertexAttribArray(vertexNormalAttribute);
+          gl.vertexAttribPointer(vertexNormalAttribute, 3, gl.FLOAT, false, 0, 0);
+
+
+          // Construct single array containing the model matrix for each instance.
+          const matrixIndices = [];
+          for (let i = 0; i < numSphereInstances; i++) {
+            const byteOffsetToMatrix = i * 16 * 4;
+            const numFloatsForView = 16;
+            matrixIndices.push(new Float32Array(
+                modelViewMatrices.buffer,
+                byteOffsetToMatrix,
+                numFloatsForView));
+          }
+
+          // Create a buffer to hold modelViewMatrices, but don't upload data yet.
+          // The data will be uploaded in the draw() function once we compute the
+          // view matrix.
+          gl.bindBuffer(gl.ARRAY_BUFFER, matrixBuffer);
+          gl.bufferData(gl.ARRAY_BUFFER, modelViewMatrices.byteLength, gl.DYNAMIC_DRAW);
+
+          // The setup of the model matrix attribute from webgl2fundamentals.org
+          const bytesPerMatrix = 4 * 16;
+          for (let i = 0; i < 4; ++i) {
+            const loc = modelViewAttribute + i;
+            gl.enableVertexAttribArray(loc);
+            // note the stride and offset
+            const offset = i * 16;  // 4 floats per row, 4 bytes per float
+            gl.vertexAttribPointer(
+                loc,              // location
+                4,                // size (num values to pull from buffer per iteration)
+                gl.FLOAT,         // type of data in buffer
+                false,            // normalize
+                bytesPerMatrix,   // stride, num bytes to advance to get to next set of values
+                offset,           // offset in buffer
+            );
+            // this line says this attribute only changes for each 1 instance
+            gl.vertexAttribDivisor(loc, 1);
+          }
+
+          // Construct an array containing color vec4 for each instance.
+          const colorVecs = new Float32Array(numSphereInstances * 4);
+          oxygen.traverse("atom", function (node, nodeNum) {
+              const color = node.getColor();
+
+              // Write the color information into colorVecs
+              for (let i = 0; i < 4; i++) {
+                  const offset = nodeNum * 4 + i;
+                  colorVecs[offset] = color[i];
+              }
+          });
+
+          // Create a buffer to hold normal matrices, but don't upload data yet.
+          // The data will be uploaded in the draw() function once we compute the
+          // view matrix.
+          gl.bindBuffer(gl.ARRAY_BUFFER, normalBuffer);
+          gl.bufferData(gl.ARRAY_BUFFER, normalMatrices.byteLength, gl.DYNAMIC_DRAW);
+
+          // The setup of the normal matrix attribute from webgl2fundamentals.org
+          const bytesPerNormalMatrix = 4 * 9; // 4 bytes per float by 9 matrix elements
+          for (let i = 0; i < 3; ++i) {
+            const loc = normalAttribute + i;
+            gl.enableVertexAttribArray(loc);
+            // note the stride and offset
+            const offset = i * 12;  // 12 bytes per matrix row
+            gl.vertexAttribPointer(
+                loc,                    // location
+                3,                      // size (num values to pull from buffer per iteration)
+                gl.FLOAT,               // type of data in buffer
+                false,                  // normalize
+                bytesPerNormalMatrix,   // stride, num bytes to advance to get to next set of values
+                offset,                 // offset in bytes to first element
+            );
+            // this line says this attribute only changes for each 1 instance
+            gl.vertexAttribDivisor(loc, 1);
+          }
+
+          // Create a buffer and store colors array in it.  Recorded in vao.
+          gl.bindBuffer(gl.ARRAY_BUFFER, gl.createBuffer());
+          gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(colorVecs), gl.STATIC_DRAW);
+
+          // The setup of the color attribute
+          const bytesPerVector = 4 * 4;
+          const loc = vertexColorAttribute;
+          gl.enableVertexAttribArray(loc);
+          // note the stride and offset
+          gl.vertexAttribPointer(
+              loc,              // location
+              4,                // size (num values to pull from buffer per iteration)
+              gl.FLOAT,         // type of data in buffer
+              false,            // normalize
+              bytesPerVector,   // stride, num bytes to advance to get to next color vector
+              0                 // offset in buffer to first color vector
+          );
+          // this line says this attribute only changes for each 1 instance
+          gl.vertexAttribDivisor(loc, 1);
+
+          return vao;
+        }
+
+        function getStickVao(gl) {
+          // Create the VAO used for multiple ball instances
+          const vao = gl.createVertexArray();
+
+          gl.bindVertexArray(vao); // After binding vao, calls to bindBuffer() and vertexAttribPointer() are "recorded" in the vao.
+
+          // Store instance vertices
+          gl.bindBuffer(gl.ARRAY_BUFFER, gl.createBuffer());
+          gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(stickVertices), gl.STATIC_DRAW);
+          gl.enableVertexAttribArray(vertexPositionAttribute);
+          gl.vertexAttribPointer(vertexPositionAttribute, 3, gl.FLOAT, false, 0, 0);
+
+          // Store instance normals
+          gl.bindBuffer(gl.ARRAY_BUFFER, gl.createBuffer());
+          gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(stickNormals), gl.STATIC_DRAW);
+          gl.enableVertexAttribArray(vertexNormalAttribute);
+          gl.vertexAttribPointer(vertexNormalAttribute, 3, gl.FLOAT, false, 0, 0);
+
+
+          // Construct single array containing the model matrix for each instance.
+          // const matrixIndices = [];
+          // for (let i = 0; i < numSphereInstances; i++) {
+          //   const byteOffsetToMatrix = i * 16 * 4;
+          //   const numFloatsForView = 16;
+          //   matrixIndices.push(new Float32Array(
+          //       modelViewMatrices.buffer,
+          //       byteOffsetToMatrix,
+          //       numFloatsForView));
+          // }
+
+          // Create a buffer to hold modelViewMatrices, but don't upload data yet.
+          // The data will be uploaded in the draw() function once we compute the
+          // view matrix.
+          gl.bindBuffer(gl.ARRAY_BUFFER, stickMatrixBuffer);
+          gl.bufferData(gl.ARRAY_BUFFER, stickModelViewMatrices.byteLength, gl.DYNAMIC_DRAW);
+
+          // The setup of the model matrix attribute from webgl2fundamentals.org
+          const bytesPerMatrix = 4 * 16;
+          for (let i = 0; i < 4; ++i) {
+            const loc = modelViewAttribute + i;
+            gl.enableVertexAttribArray(loc);
+            // note the stride and offset
+            const offset = i * 16;  // 4 floats per row, 4 bytes per float
+            gl.vertexAttribPointer(
+                loc,              // location
+                4,                // size (num values to pull from buffer per iteration)
+                gl.FLOAT,         // type of data in buffer
+                false,            // normalize
+                bytesPerMatrix,   // stride, num bytes to advance to get to next set of values
+                offset,           // offset in buffer
+            );
+            // this line says this attribute only changes for each 1 instance
+            gl.vertexAttribDivisor(loc, 1);
+          }
+
+          // Construct an array containing color vec4 for each instance.
+          const colorVecs = new Float32Array(numStickInstances * 4);
+          oxygen.traverse("bond", function (node, nodeNum) {
+              const color = node.getColor();
+
+              // Write the color information into colorVecs
+              for (let i = 0; i < 4; i++) {
+                  const offset = nodeNum * 4 + i;
+                  colorVecs[offset] = color[i];
+              }
+          });
+
+          // Create a buffer to hold normal matrices, but don't upload data yet.
+          // The data will be uploaded in the draw() function once we compute the
+          // view matrix.
+          gl.bindBuffer(gl.ARRAY_BUFFER, stickNormalBuffer);
+          gl.bufferData(gl.ARRAY_BUFFER, stickNormalMatrices.byteLength, gl.DYNAMIC_DRAW);
+
+          // The setup of the normal matrix attribute from webgl2fundamentals.org
+          const bytesPerNormalMatrix = 4 * 9; // 4 bytes per float by 9 matrix elements
+          for (let i = 0; i < 3; ++i) {
+            const loc = normalAttribute + i;
+            gl.enableVertexAttribArray(loc);
+            // note the stride and offset
+            const offset = i * 12;  // 12 bytes per matrix row
+            gl.vertexAttribPointer(
+                loc,                    // location
+                3,                      // size (num values to pull from buffer per iteration)
+                gl.FLOAT,               // type of data in buffer
+                false,                  // normalize
+                bytesPerNormalMatrix,   // stride, num bytes to advance to get to next set of values
+                offset,                 // offset in bytes to first element
+            );
+            // this line says this attribute only changes for each 1 instance
+            gl.vertexAttribDivisor(loc, 1);
+          }
+
+          // Create a buffer and store colors array in it.  Recorded in vao.
+          gl.bindBuffer(gl.ARRAY_BUFFER, gl.createBuffer());
+          gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(colorVecs), gl.STATIC_DRAW);
+
+          // The setup of the color attribute
+          const bytesPerVector = 4 * 4;
+          const loc = vertexColorAttribute;
+          gl.enableVertexAttribArray(loc);
+          // note the stride and offset
+          gl.vertexAttribPointer(
+              loc,              // location
+              4,                // size (num values to pull from buffer per iteration)
+              gl.FLOAT,         // type of data in buffer
+              false,            // normalize
+              bytesPerVector,   // stride, num bytes to advance to get to next color vector
+              0                 // offset in buffer to first color vector
+          );
+          // this line says this attribute only changes for each 1 instance
+          gl.vertexAttribDivisor(loc, 1);
+
+          return vao;
+        }
+
+        function updateSphereMatrices(root, viewTx) {
+              // For each frame, traverse the scene graph and compute new modelView matrix for each node.
+              root.traverse("atom", function (node, nodeNum) {
+                  const modelTx = node.getModelTx();
+
+                  // Set up model-view transform
+                  const model = node.getAbsoluteModelTx();
+                  const modelView = glMatrix.mat4.create();
+                  glMatrix.mat4.mul(modelView, viewTx, modelTx);
+
+                  // Update the modelView matrix based on new time
+                  const stride = 4 * 4;
+                  modelViewMatrices.set(modelView, stride * nodeNum);
+
+                  // Update the normal matrix
+                  var normalMatrix = glMatrix.mat3.create();
+                  glMatrix.mat3.normalFromMat4(normalMatrix, modelView);
+                  const normalStride = 3 * 3;
+                  normalMatrices.set(normalMatrix, normalStride * nodeNum);
+              });
+
+              // upload the new modelView matrix data
+              gl.bindBuffer(gl.ARRAY_BUFFER, matrixBuffer);
+              gl.bufferSubData(gl.ARRAY_BUFFER, 0, modelViewMatrices);
+
+              // Upload new normal matrix data
+              gl.bindBuffer(gl.ARRAY_BUFFER, normalBuffer);
+              gl.bufferSubData(gl.ARRAY_BUFFER, 0, normalMatrices);
+
+        }
+
+        function updateStickMatrices(root, viewTx) {
+              // For each frame, traverse the scene graph and compute new modelView matrix for each node.
+              root.traverse("bond", function (node, nodeNum) {
+                  const modelTx = node.getModelTx();
+
+                  // Set up model-view transform
+                  const model = node.getAbsoluteModelTx();
+                  const modelView = glMatrix.mat4.create();
+                  glMatrix.mat4.mul(modelView, viewTx, modelTx);
+
+                  // Update the modelView matrix based on new time
+                  const stride = 4 * 4;
+                  stickModelViewMatrices.set(modelView, stride * nodeNum);
+
+                  // Update the normal matrix
+                  var normalMatrix = glMatrix.mat3.create();
+                  glMatrix.mat3.normalFromMat4(normalMatrix, modelView);
+                  const normalStride = 3 * 3;
+                  stickNormalMatrices.set(normalMatrix, normalStride * nodeNum);
+              });
+
+              // upload the new modelView matrix data
+              gl.bindBuffer(gl.ARRAY_BUFFER, stickMatrixBuffer);
+              gl.bufferSubData(gl.ARRAY_BUFFER, 0, stickModelViewMatrices);
+
+              // Upload new normal matrix data
+              gl.bindBuffer(gl.ARRAY_BUFFER, stickNormalBuffer);
+              gl.bufferSubData(gl.ARRAY_BUFFER, 0, stickNormalMatrices);
+
+        }
+      }
+
+      function getUnitSphereCoords(scale) {
+
+        var coords = [25 * 13 * 3]
+        var lMultiplier = 2 * Math.PI / 24;
+        var mMultiplier = 2 * Math.PI / 24;
+        for (var l = 0; l <25; l++) {
+            var lRads = l * lMultiplier;
+            for (var m = -6; m < 7; m++) {
+                var mRads = m * mMultiplier;
+
+                var z = scale * Math.sin(mRads);
+                var x = scale * Math.cos(mRads) * Math.cos(lRads);
+                var y = scale * Math.cos(mRads) * Math.sin(lRads);
+                coords[l * 13 * 3 + (m + 6) * 3 + 0] = x;
+                coords[l * 13 * 3 + (m + 6) * 3 + 1] = y;
+                coords[l * 13 * 3 + (m + 6) * 3 + 2] = z;
+            }
+        }
+
+        var triangles = [];
+
+        for (l = 0; l <24; l++) {
+            for (var m = 0; m < 12; m++) {
+                var ll = coords.slice( l      * 13 * 3 +  m      * 3,  l      * 13 * 3 +  m      * 3 + 3);
+                var lr = coords.slice((l + 1) * 13 * 3 +  m      * 3, (l + 1) * 13 * 3 +  m      * 3 + 3);
+                var ul = coords.slice( l      * 13 * 3 + (m + 1) * 3,  l      * 13 * 3 + (m + 1) * 3 + 3);
+                var ur = coords.slice((l + 1) * 13 * 3 + (m + 1) * 3, (l + 1) * 13 * 3 + (m + 1) * 3 + 3);
+
+                // Push first of two triangles
+                triangles.push(...ll);
+                triangles.push(...lr);
+                triangles.push(...ur);
+
+                // Push second of two triangles
+                triangles.push(...ul);
+                triangles.push(...ll);
+                triangles.push(...ur);
+            }
+        }
+
+        return triangles;
+      }
+
+    // function getCylinder() {
+
+    //     var coords = [25 * 13 * 3];
+    //     var lMultiplier = 2 * Math.PI / 24;
+    //     var mMultiplier = 2 * Math.PI / 24;
+    //     for (var l = 0; l <25; l++) {
+    //         var lRads = l * lMultiplier;
+    //         for (var m = -6; m < 7; m++) {
+    //             var x;
+    //             var y;
+    //             var z;
+    //             if ((m === -6) || (m === 6)) {
+    //                 x = 0;
+    //                 y = 0;
+    //                 if (m === -6) {
+    //                     z = -1.0;
+    //                 } else {
+    //                     z = 1.0;
+    //                 }
+    //             } else {
+    //                 x = Math.cos(lRads);
+    //                 y = Math.sin(lRads);
+    //                 z = m / 5.0;
+    //             }
+    //             coords[l * 13 * 3 + (m + 6) * 3 + 0] = x;
+    //             coords[l * 13 * 3 + (m + 6) * 3 + 1] = y;
+    //             coords[l * 13 * 3 + (m + 6) * 3 + 2] = z;
+    //         }
+    //     }
+
+    //     var triangles = [];
+
+    //     for (l = 0; l <24; l++) {
+    //         for (var m = 0; m < 12; m++) {
+    //             var ll = coords.slice( l      * 13 * 3 +  m      * 3,  l      * 13 * 3 +  m      * 3 + 3);
+    //             var lr = coords.slice((l + 1) * 13 * 3 +  m      * 3, (l + 1) * 13 * 3 +  m      * 3 + 3);
+    //             var ul = coords.slice( l      * 13 * 3 + (m + 1) * 3,  l      * 13 * 3 + (m + 1) * 3 + 3);
+    //             var ur = coords.slice((l + 1) * 13 * 3 + (m + 1) * 3, (l + 1) * 13 * 3 + (m + 1) * 3 + 3);
+
+    //             // Push first of two triangles
+    //             triangles.push(...ll);
+    //             triangles.push(...lr);
+    //             triangles.push(...ur);
+
+    //             // Push second of two triangles
+    //             triangles.push(...ul);
+    //             triangles.push(...ll);
+    //             triangles.push(...ur);
+    //         }
+    //     }
+
+    //     return triangles;
+    //   }
+
+
+    function getCylinder() {
+
+        var coords = [25 * 4 * 3];
+        var lMultiplier = 2 * Math.PI / 24;
+        var mMultiplier = 2 * Math.PI / 24;
+        for (var l = 0; l <25; l++) {
+            var lRads = l * lMultiplier;
+            for (var m = -2; m < 2; m++) {
+                var x;
+                var y;
+                var z;
+
+                // Determine x and y coords
+                if ((m === -2) || (m === 1)) {
+                    x = 0;
+                    y = 0;
+                } else {
+                    x = Math.cos(lRads);
+                    y = Math.sin(lRads);
+                }
+
+                // Determine z coord
+                if (m < 0) {
+                    z = -1.0;
+                } else {
+                    z = 1.0;
+                }
+
+                coords[l * 4 * 3 + (m + 2) * 3 + 0] = x;
+                coords[l * 4 * 3 + (m + 2) * 3 + 1] = y;
+                coords[l * 4 * 3 + (m + 2) * 3 + 2] = z;
+            }
+        }
+
+        var triangles = [];
+
+        for (l = 0; l <24; l++) {
+            for (var m = 0; m < 3; m++) {
+                var ll = coords.slice( l      * 4 * 3 +  m      * 3,  l      * 4 * 3 +  m      * 3 + 3);
+                var lr = coords.slice((l + 1) * 4 * 3 +  m      * 3, (l + 1) * 4 * 3 +  m      * 3 + 3);
+                var ul = coords.slice( l      * 4 * 3 + (m + 1) * 3,  l      * 4 * 3 + (m + 1) * 3 + 3);
+                var ur = coords.slice((l + 1) * 4 * 3 + (m + 1) * 3, (l + 1) * 4 * 3 + (m + 1) * 3 + 3);
+
+                // Push first of two triangles
+                triangles.push(...ll);
+                triangles.push(...lr);
+                triangles.push(...ur);
+
+                // Push second of two triangles
+                triangles.push(...ul);
+                triangles.push(...ll);
+                triangles.push(...ur);
+            }
+        }
+
+        return triangles;
+      }
+
+    function getCylinderNormals() {
+
+        var coords = [25 * 4 * 3];
+        var lMultiplier = 2 * Math.PI / 24;
+        var mMultiplier = 2 * Math.PI / 24;
+        for (var l = 0; l <25; l++) {
+            var lRads = l * lMultiplier;
+            for (var m = -2; m < 2; m++) {
+                var x;
+                var y;
+                var z;
+
+                // Determine x and y coords
+                if ((m === -2) || (m === 1)) {
+                    x = 0;
+                    y = 0;
+                } else {
+                    x = Math.cos(lRads);
+                    y = Math.sin(lRads);
+                }
+
+                // Determine z coord
+                if (m < 0) {
+                    z = -1.0;
+                } else {
+                    z = 1.0;
+                }
+
+                coords[l * 4 * 3 + (m + 2) * 3 + 0] = x;
+                coords[l * 4 * 3 + (m + 2) * 3 + 1] = y;
+                coords[l * 4 * 3 + (m + 2) * 3 + 2] = z;
+            }
+        }
+
+        var triangles = [];
+
+        for (l = 0; l <24; l++) {
+            for (var m = 0; m < 3; m++) {
+                if (m === 0) {
+                    ll = [0.0, 0.0, -1.0];
+                    lr = [0.0, 0.0, -1.0];
+                    ul = [0.0, 0.0, -1.0];
+                    ur = [0.0, 0.0, -1.0];
+                } else if (m === 2) {
+                    ll = [0.0, 0.0, 1.0];
+                    lr = [0.0, 0.0, 1.0];
+                    ul = [0.0, 0.0, 1.0];
+                    ur = [0.0, 0.0, 1.0];
+                } else {
+                    ll = coords.slice( l      * 4 * 3 +  m      * 3,  l      * 4 * 3 +  m      * 3 + 2);
+                    lr = coords.slice((l + 1) * 4 * 3 +  m      * 3, (l + 1) * 4 * 3 +  m      * 3 + 2);
+                    ul = coords.slice( l      * 4 * 3 + (m + 1) * 3,  l      * 4 * 3 + (m + 1) * 3 + 2);
+                    ur = coords.slice((l + 1) * 4 * 3 + (m + 1) * 3, (l + 1) * 4 * 3 + (m + 1) * 3 + 2);
+                    ll.push(0.0);
+                    lr.push(0.0);
+                    ul.push(0.0);
+                    ur.push(0.0);
+                }
+                // Push normals for first of two triangles
+                triangles.push(...ll);
+                triangles.push(...lr);
+                triangles.push(...ur);
+
+                // Push normals for second of two triangles
+                triangles.push(...ul);
+                triangles.push(...ll);
+                triangles.push(...ur);
+            }
+        }
+
+        return triangles;
+      }
+      function createProgram(gl, vertexShaderSource, fragmentShaderSource) {
+        // Compile vertex shader
+        var vertexShader = gl.createShader(gl.VERTEX_SHADER);
+        gl.shaderSource(vertexShader, vertexShaderSource);
+        gl.compileShader(vertexShader);
+        if (!gl.getShaderParameter(vertexShader, gl.COMPILE_STATUS)) {
+            console.log('Failed to compile vertex shader.');
+            console.log(gl.getShaderInfoLog(vertexShader));
+            return;
+        }
+
+        // Compile fragment shader
+        var fragmentShader = gl.createShader(gl.FRAGMENT_SHADER);
+        gl.shaderSource(fragmentShader, fragmentShaderSource);
+        gl.compileShader(fragmentShader);
+        if (!gl.getShaderParameter(fragmentShader, gl.COMPILE_STATUS)) {
+            console.log('Failed to compile shader.');
+            console.log(gl.getShaderInfoLog(fragmentShader));
+        }
+
+        // Link the program.
+        var shaderProgram = gl.createProgram();
+        gl.attachShader(shaderProgram, vertexShader);
+        gl.attachShader(shaderProgram, fragmentShader);
+        gl.linkProgram(shaderProgram);
+        if (! gl.getProgramParameter(shaderProgram, gl.LINK_STATUS)) {
+            console.log("Failed to link program.");
+            return;
+        }
+
+        // Validate program
+        gl.validateProgram(shaderProgram);
+        if (!gl.getProgramParameter(shaderProgram, gl.VALIDATE_STATUS)) {
+            console.log('Program validation failed.');
+            return;
+        }
+
+        return shaderProgram;
+      }
+
+      function getOxygenGraph() {
+          // Create root node with oxygen molecule
+          const oxygen = new SceneNode();
+          oxygen.setSize(1.0);
+          oxygen.setType("atom");
+          oxygen.setColorByName("red");
+
+          // Create first child node with hydrogen
+          const hydrogen1 = new SceneNode();
+          hydrogen1.setSize(0.7);
+          hydrogen1.setType("atom");
+          hydrogen1.setColorByName("white");
+          const h1Model = glMatrix.mat4.create();
+          glMatrix.mat4.rotateY(h1Model, h1Model, glMatrix.glMatrix.toRadian(-55.0));
+          glMatrix.mat4.translate(h1Model, h1Model, [0.0, 0.0, 4.0]);
+          hydrogen1.setModelTx(h1Model);
+          oxygen.addChild(hydrogen1);
+          hydrogen1.setParent(oxygen);
+
+          // Create second child node with hydrogen/oxygen bond
+          const bond1 = new SceneNode();
+          bond1.setType("bond");
+          bond1.setColorByName("grey");
+          const b1Model = glMatrix.mat4.create();
+          glMatrix.mat4.rotateY(b1Model, b1Model, glMatrix.glMatrix.toRadian(-55.0));
+          glMatrix.mat4.translate(b1Model, b1Model, [0.0, 0.0, 2.0]);
+          glMatrix.mat4.scale(b1Model, b1Model, [0.25, 0.25, 2.0]);
+          bond1.setModelTx(b1Model);
+          oxygen.addChild(bond1);
+          bond1.setParent(oxygen);
+
+          // Create third child node with hydrogen atom
+          const hydrogen2 = new SceneNode();
+          hydrogen2.setSize(0.7);
+          hydrogen2.setType("atom");
+          hydrogen2.setColorByName("white");
+          const h2Model = glMatrix.mat4.create();
+          glMatrix.mat4.rotateY(h2Model, h2Model, glMatrix.glMatrix.toRadian(55));
+          glMatrix.mat4.translate(h2Model, h2Model, [0.0, 0.0, 4.0]);
+          hydrogen2.setModelTx(h2Model);
+          oxygen.addChild(hydrogen2);
+          hydrogen2.setParent(oxygen);
+
+          // Create fourth child node with hydrogen/oxygen bond
+          const bond2 = new SceneNode();
+          bond2.setType("bond");
+          bond2.setColorByName("grey");
+          const b2Model = glMatrix.mat4.create();
+          glMatrix.mat4.rotateY(b2Model, b2Model, glMatrix.glMatrix.toRadian(55.0));
+          glMatrix.mat4.translate(b2Model, b2Model, [0.0, 0.0, 2.0]);
+          glMatrix.mat4.scale(b2Model, b2Model, [0.25, 0.25, 2.0]);
+          bond2.setModelTx(b2Model);
+          oxygen.addChild(bond2);
+          bond2.setParent(oxygen);
+
+
+
+          return oxygen;
+      }
+
+    </script>
 </body>
 </html>
