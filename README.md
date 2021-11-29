@@ -2,8 +2,9 @@
 
 Web Molecule - Jake Kugel, 2021
 
-This page displays 3-dimensional ball and stick models of various molecules.  It
-is developed using WebGL, and it uses the following 3D graphics techniques:
+This page (visible [here](https://jakekugel.github.io/uiuc-cs418-jakugel2/)),
+displays 3-dimensional ball and stick models of various molecules.  It uses
+native browser WebGL2, and uses the following 3D graphics techniques:
 
 * **smooth per-pixel lighting** - shapes in scene show diffuse and specular
    lighting on per-pixel basis.
@@ -12,9 +13,10 @@ is developed using WebGL, and it uses the following 3D graphics techniques:
 * **texture mapping** - chemical symbols displayed on spheres.
 * **sphere mapping** - a reflection of the UIUC football stadium is seen in objects.
 * **instancing** - a WebGL technique used to draw multiple instances of the same
-    triangle mesh in a scene.
+    triangle mesh in a scene for higher performance.
 * **grid-based texture mapping** - storing multiple texture maps in a grid, and
-    referencing different regions of grid on per-instance basis.
+    referencing different regions of grid on per-instance basis, also for
+    higher performance.
 
 This page was developed by Jake Kugel as the final project for class CS-418 at
 the University of Illinois at Urbana-Champaign, taught by Professor John Hart,
@@ -22,8 +24,8 @@ as part of the Online MCS program.
 
 ## Credits
 Most concepts that were used to build this visualization came from UIUC CS-418
-and Prof. Hart.  This is an excellent class to learn modern interactive
-3D graphics.
+and Prof. Hart.  This is an excellent class to learn modern interactive computer
+graphics.
 
 This page also uses several WebGL2 techniques described in the very useful
 website https://webgl2fundamentals.org/.
