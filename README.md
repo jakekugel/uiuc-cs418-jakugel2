@@ -22,13 +22,13 @@ as part of the Online MCS program.
 
 ## Credits
 Most concepts that were used to build this visualization came from UIUC CS-418
-and Professor John Hart.  This is an excellent class to learn modern interactive
+and Prof. Hart.  This is an excellent class to learn modern interactive
 3D graphics.
 
 This page also uses several WebGL2 techniques described in the very useful
 website https://webgl2fundamentals.org/.
 
-Thanks to my dad, Dr. Roger Kugel, for a conversation about covalent bonds and
+Thanks to my dad, Prof. Roger Kugel, for a conversation about covalent bonds and
 how to determine where bonds exist given a molecular 3D structure.
 
 Thanks to my son, Eric Kugel, for a conversation about JavaScript best practices
