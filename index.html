@@ -1,316 +1,555 @@
 <!doctype html>
+<!--
+
+Web Molecule - 2021, Jake Kugel.
+
+For full details, view the README here:
+
+
+
+-->
+
 <html lang="en">
-    <!-- Jake Kugel.
-
-         Draw a simple water molecule with shading.
-
-         Some HTML tips from https://www.sitepoint.com/a-basic-html5-template/.
-         Some WebGL examples from CS418 Interactive Computer Graphics by Prof. John Hart, UIUC.
-         Instancing example from https://webgl2fundamentals.org/webgl/lessons/webgl-instanced-drawing.html
-    -->
 
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>WebGL Molecule Example</title>
-    <meta name="description" content="Jake Kugel WebGL2 hello world.">
+    <title>Web Molecule</title>
+    <meta name="description" content="3D molecular viewer using WebGL.">
     <meta name="author" content="Jake Kugel">
 
     <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+    <style>
+        body {
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+            font-smoothing: antialiased;
+        }
+
+        .button-col {
+            float: left;
+            width: 230px;
+        }
+
+        .main-col {
+            margin-left: 230px;
+        }
+
+        .text {
+            color: #2680D0;
+            font-size: 12pt;
+            font-family:sans-serif;"
+        }
+
+        .title {
+            margin-left: 230px;
+        }
+
+        .author {
+            color: #2680D0;
+            font-size: 20pt;
+            font-family:sans-serif;"
+        }
+
+        .button {
+            display: inline-block;
+            color: #2680D0;
+            background-color: #134074;
+            font-size: 14pt;
+            font-family:sans-serif;
+            border-style: solid;
+            border-width: 2px;
+            border-color: #134074;
+            padding: 0.25em;
+            cursor: pointer;
+            width: 200px;
+            margin: 0.3em;
+            border-radius: 0.3em;
+            text-align: center;
+        }
+
+        .button:hover {
+            color: #60D0FF;
+            border-color: #60D0FF;
+            background-color: #2680D0;
+        }
+
+        .selected {
+            display: inline-block;
+            color: #60D0FF;
+            background-color: #2680D0;
+            font-size: 14pt;
+            font-family:sans-serif;
+            border-style: solid;
+            border-width: 2px;
+            border-color: #2680D0;
+            padding: 0.25em;
+            cursor: pointer;
+            width: 200px;
+            margin: 0.3em;
+            border-radius: 0.3em;
+            text-align: center;
+        }
+
+        .selected:hover {
+            color: white;
+            border-color: white;
+        }
+
+        .logo {
+            margin-left: 50px;
+            margin-top: 300px;
+        }
+        #myCanvas {
+            border-style: solid;
+            border-width: 1px;
+            border-color: #134074;
+            padding: 0em;
+            margin: 0.3em;
+        }
+
+
+    </style>
 </head>
-<body onload="main();">
+<body onload="main();" style = "background-color: black">
+<div class=title>
+  <image src="webmolecule.png" width="300" height="50"/>
+</div>
+<div class="button-col">
+    <div id="buttonHelium" class="button" onclick="changeMolecule('helium');">helium</div>
+    <div id="buttonWater" class="selected" onclick="changeMolecule('water');">water</div>
+    <div id="buttonCaffeine" class="button" onclick="changeMolecule('caffeine');">caffeine</div>
+    <div id="buttonCortisol" class="button" onclick="changeMolecule('cortisol');">hydrocortisone</div>
+    <div id="buttonNanotube" class="button" onclick="changeMolecule('nanotube');">nanotube</div>
+    <div id="buttonDna" class="button" onclick="changeMolecule('dna');">DNA</div>
+
+    <image class=logo src="uiuc-compsci-2.jpg" width="100" height="100"/>
+</div>
+<div class="main-col">
     <canvas id="myCanvas" width="800" height="800"></canvas>
 
     <!-- Load matric helper library. -->
     <script src="gl-matrix-min.js"></script>
 
     <!-- Load debugging script. -->
-    <script src="webgl-debug.js"></script>
-
-    <!-- Load Gregg Man Linter -->
-    <script src="https://greggman.github.io/webgl-lint/webgl-lint.js" crossorigin></script>
-
+<!--     <script src="webgl-debug.js"></script>
+ -->
+    <!-- Load Linter -->
+<!--     <script src="https://greggman.github.io/webgl-lint/webgl-lint.js" crossorigin></script>
+ -->
     <script>
-        var lastKey;
+      let moleculeName = 'water';
 
+      function changeMolecule(name) {
+          updateButton(name, 'helium', document.getElementById('buttonHelium'));
+          updateButton(name, 'water', document.getElementById('buttonWater'));
+          updateButton(name, 'caffeine', document.getElementById('buttonCaffeine'));
+          updateButton(name, 'cortisol', document.getElementById('buttonCortisol'));
+          updateButton(name, 'dna', document.getElementById('buttonDna'));
+          updateButton(name, 'nanotube', document.getElementById('buttonNanotube'));
 
-      window.onkeypress = function (event) {
-        console.log(event.keyCode)
-        lastKey = event.keyCode;
+          // Update global variable
+          moleculeName = name;
+
+          // Launch animation with new molecule
+          if (isMobileDevice()) {
+              displayError("Apologies, Web Molecule does not support mobile devices at this time.");
+          } else {
+              animateMolecule(moleculeName);
+          }
       }
 
-      class SceneNode {
+      function updateButton(newName, buttonName, element) {
+          let selected = (newName === buttonName);
+          if (selected) {
+              element.classList.add('selected');
+              element.classList.remove('button');
+          } else {
+              element.classList.add('button');
+              element.classList.remove('selected');
+          }
+      }
+
+      class Molecule {
           constructor() {
-              this.children = [];
-              this.modelTx = glMatrix.mat4.create();
-              this.parent = null;
-              this.size = 0.0;
-              this.color = "";
-              this.type = null;
+              this.atoms = [];
+              this.bonds = [];
+              this.bondLengths = [
+                  { distance: 74, s1: 'H', s2: 'H'},
+                  { distance: 109, s1: 'H', s2: 'C'},
+                  { distance: 154, s1: 'C', s2: 'C'},
+                  { distance: 147, s1: 'C', s2: 'N'},
+                  { distance: 143, s1: 'C', s2: 'O'},
+                  { distance: 187, s1: 'C', s2: 'P'},
+                  { distance: 96, s1: 'O', s2: 'H'},
+                  { distance: 101, s1: 'H', s2: 'N'},
+                  { distance: 142, s1: 'H', s2: 'P'},
+                  { distance: 160, s1: 'O', s2: 'P'},
+                  { distance: 177, s1: 'N', s2: 'P'},
+                  { distance: 144, s1: 'N', s2: 'O'},
+
+                  { distance: 134, s1: 'C', s2: 'C'}, // double
+                  { distance: 127, s1: 'C', s2: 'N'}, // double
+                  { distance: 123, s1: 'C', s2: 'O'}, // double
+                  { distance: 130, s1: 'P', s2: 'O'}  // double
+
+              ];
           }
 
-          traverse(type, process) {
-              // Recursively process nodes, each node represents one instance
-              const nodesToProcess = [this];
-              let nodeNum = 0;
+          addAtom(atom) {
+              this.atoms.push(atom);
+          }
 
-              // Traverse the tree and store updated modelview matrices into modelView array
-              while (nodesToProcess.length > 0) {
+          getAtoms() {
+              return this.atoms;
+          }
 
-                  // Remove first item from array
-                  const node = nodesToProcess[0];
-                  nodesToProcess.splice(0, 1);
+          addBond(bond) {
+              this.bonds.push(bond);
+          }
 
-                  // Add children to nodesToProcess
-                  nodesToProcess.push(...node.getChildren());
+          getBonds() {
+              return this.bonds;
+          }
 
-                  if (type === node.getType()) {
-                      process(node, nodeNum);
-                      nodeNum++;
+          center() {
+              let xmin;
+              let xmax;
+              let ymin;
+              let ymax;
+              let zmin;
+              let zmax;
+              for (let i = 0; i < this.atoms.length; i++) {
+                  let atom = this.atoms[i];
+                  let x = atom.getX();
+                  let y = atom.getY();
+                  let z = atom.getZ();
+
+                  if (i === 0) {
+                      xmin = x;
+                      xmax = x;
+                      ymin = y;
+                      ymax = y;
+                      zmin = z;
+                      zmax = z;
+                  } else {
+                      if (x < xmin) xmin = x;
+                      if (x > xmax) xmax = x;
+                      if (y < ymin) ymin = y;
+                      if (y > ymax) ymax = y;
+                      if (z < zmin) zmin = z;
+                      if (z > zmax) zmax = z;
                   }
+              }
 
+              let xcenter = (xmax + xmin) / 2.0;
+              let ycenter = (ymax + ymin) / 2.0;
+              let zcenter = (zmax + zmin) / 2.0;
+
+              for (let i = 0; i < this.atoms.length; i++) {
+                  let atom = this.atoms[i];
+                  atom.setX(atom.getX() - xcenter);
+                  atom.setY(atom.getY() - ycenter);
+                  atom.setZ(atom.getZ() - zcenter);
               }
           }
 
-          getTreeSize(type) {
-              let size;
-
-              if (this.type === type) {
-                size = 1;
-              } else {
-                size = 0;
+          setScale(scale) {
+              for (let i = 0; i < this.atoms.length; i++) {
+                  let atom = this.atoms[i];
+                  atom.setScale(scale);
               }
+          }
 
-              for (let i = 0; i < this.children.length; i++) {
-                  size = size + this.children[i].getTreeSize(type);
+          addBonds(scale, picometerFactor) {
+              for (let i = 0; i < this.atoms.length - 1; i++) {
+                  for (let j = i + 1; j < this.atoms.length; j++) {
+                      let a1 = this.atoms[i];
+                      let a2 = this.atoms[j];
+                      let distance = a1.getDistance(a2);
+                      let s1 = a1.getSymbol();
+                      let s2 = a2.getSymbol();
+                      for (let pairs = 0; pairs < this.bondLengths.length; pairs++) {
+                          let bond = this.bondLengths[pairs];
+                          if (Math.abs(distance * picometerFactor - bond.distance) < 10) {
+                              if (((s1 === bond.s1) && (s2 === bond.s2)) ||
+                                      ((s1 === bond.s2) && (s2 === bond.s1))) {
+                                  this.addBond(new Bond(a1, a2, scale));
+                                  break;
+                              }
+                          }
+                      }
+                  }
               }
-              return size;
           }
+      }
 
-          setSize(size) {
-              this.size = size;
-          }
+      class Atom {
+          constructor(x, y, z, symbol) {
+              this.x = x;
+              this.y = y;
+              this.z = z;
+              this.symbol = symbol;
+              this.scale = 1.0;
 
-          getSize() {
-              return this.size;
-          }
-
-          setType(type) {
-              this.type = type;
-          }
-
-          getType() {
-              return this.type;
-          }
-
-          setColorByName(color) {
-              if (color === "red") {
-                  this.color = [1.0, 0.0, 0.0, 1.0];
-              } else if (color === "white") {
-                  this.color = [1.0, 1.0, 1.0, 1.0];
-              } else if (color === "black") {
-                  this.color = [0.0, 0.0, 0.0, 1.0];
-              } else if (color === "grey") {
-                  this.color = [0.5, 0.5, 0.5, 1.0];
-              }
+              this.updateModelMatrix();
           }
 
           getColor() {
-              return this.color;
-          }
-
-          addChild(node) {
-              this.children.push(node);
-          }
-
-          getChildren() {
-              return this.children;
-          }
-
-          getAbsoluteModelTx() {
-              var node = this;
-              var model = glMatrix.mat4.create();
-              while (node != null) {
-                  glMatrix.mat4.mul(model, model, node.getModelTx());
-                  node = node.getParent();
+              if (this.symbol === "O") {
+                  return [1.0, 0.0, 0.0, 1.0];
+              } else if (this.symbol === "H") {
+                  return [1.0, 1.0, 1.0, 1.0];
+              } else if (this.symbol === "N") {
+                  return [0.0, 0.0, 1.0, 1.0];
+              } else if (this.symbol === "C") {
+                  return [0.5, 0.5, 0.5, 1.0];
+              } else if (this.symbol === "P") {
+                  return [0.0, 1.0, 0.0, 1.0];
+              } else if (this.symbol === "He") {
+                  return [0.0, 0.7, 1.0, 1.0];
+              } else if (this.symbol === "Y") {
+                  return [1.0, 1.0, 0.0, 1.0];
               }
-
-              return model;
           }
 
-          setParent(parent) {
-              this.parent = parent;
+          getSymbol() {
+              return this.symbol;
           }
 
-          getParent() {
-              return this.parent;
+          getX() {
+              return this.x;
           }
 
-          setModelTx(modelTx) {
-            this.modelTx = modelTx;
+          setX(x) {
+              this.x = x;
+              this.updateModelMatrix();
           }
 
-          getModelTx() {
-            return this.modelTx;
+          getY() {
+              return this.y;
+          }
+
+          setY(y) {
+              this.y = y;
+              this.updateModelMatrix();
+          }
+
+          getZ() {
+              return this.z;
+          }
+
+          setZ(z) {
+              this.z = z;
+              this.updateModelMatrix();
+          }
+
+          setScale(scale) {
+              this.scale = scale;
+              this.updateModelMatrix();
+          }
+
+          updateModelMatrix() {
+              this.modelMatrix = glMatrix.mat4.create();
+              glMatrix.mat4.translate(this.modelMatrix, this.modelMatrix, [this.x, this.y, this.z]);
+              glMatrix.mat4.scale(this.modelMatrix, this.modelMatrix, [this.scale, this.scale, this.scale]);
+          }
+
+          getModelMatrix() {
+              return this.modelMatrix;
+          }
+
+          getDistance(other) {
+              let dx = this.x - other.getX();
+              let dy = this.y - other.getY();
+              let dz = this.z - other.getZ();
+              return Math.sqrt(dx*dx + dy*dy + dz*dz);
+          }
+      }
+
+      class Bond {
+          constructor(atom1, atom2, width) {
+              this.atom1 = atom1;
+              this.atom2 = atom2;
+              this.color = "grey";
+              this.width = width;
+              this.modelMatrix = null;
+
+              this.updateModelMatrix();
+          }
+
+          updateModelMatrix() {
+              // Compute model matrix
+              const startX = this.atom1.getX();
+              const startY = this.atom1.getY();
+              const startZ = this.atom1.getZ();
+              const endX = this.atom2.getX();
+              const endY = this.atom2.getY();
+              const endZ = this.atom2.getZ();
+
+              // Create orthogonal t, u, v coordinate system where v is desired direction of bond
+              let z = glMatrix.vec3.create();
+              z[2] = 1.0;
+
+              let v = glMatrix.vec3.fromValues(endX - startX, endY - startY, endZ - startZ);
+              let length = glMatrix.vec3.length(v);
+              glMatrix.vec3.scale(v, v, 1.0 / glMatrix.vec3.length(v));
+
+              let t = glMatrix.vec3.create();
+              glMatrix.vec3.cross(t, v, z);
+              glMatrix.vec3.scale(t, t, 1.0 / glMatrix.vec3.length(t));
+
+              let u = glMatrix.vec3.create();
+              glMatrix.vec3.cross(u, t, v);
+              glMatrix.vec3.scale(u, u, 1.0 / glMatrix.vec3.length(u));
+
+              // Build rotation
+              let rotationMatrix = glMatrix.mat4.create();
+              rotationMatrix[0] = t[0];
+              rotationMatrix[1] = t[1];
+              rotationMatrix[2] = t[2];
+              rotationMatrix[4] = u[0];
+              rotationMatrix[5] = u[1];
+              rotationMatrix[6] = u[2];
+              rotationMatrix[8] = v[0];
+              rotationMatrix[9] = v[1];
+              rotationMatrix[10] = v[2];
+
+              // Assign the coordinate vectors to homogeneous 4x4 matrix to create rotation
+              this.modelMatrix = glMatrix.mat4.create();
+              glMatrix.mat4.translate(this.modelMatrix, this.modelMatrix, [startX, startY, startZ]);
+              glMatrix.mat4.mul(this.modelMatrix, this.modelMatrix, rotationMatrix);
+              glMatrix.mat4.scale(this.modelMatrix, this.modelMatrix, [this.width, this.width, length / 2]);
+              glMatrix.mat4.translate(this.modelMatrix, this.modelMatrix, [0, 0, 1.0]);
+          }
+
+          getColor() {
+              if (this.color === "red") {
+                  return [1.0, 0.0, 0.0, 1.0];
+              } else if (this.color === "white") {
+                  return [1.0, 1.0, 1.0, 1.0];
+              } else if (this.color === "black") {
+                  return [0.0, 0.0, 0.0, 1.0];
+              } else if (this.color === "grey") {
+                  return [0.5, 0.5, 0.5, 1.0];
+              }
+          }
+
+          getStartAtom() {
+              return this.atom1;
+          }
+
+          getEndAtom() {
+              return this.atom2;
+          }
+
+          getModelMatrix() {
+              return this.modelMatrix;
+          }
+
+          getSymbol() {
+              return "";
           }
       }
 
 
       function main() {
+          if (isMobileDevice()) {
+              displayError("Apologies, Web Molecule does not support mobile devices at this time.");
+          } else {
+              animateMolecule(moleculeName);
+          }
+      }
+
+      function animateMolecule(name) {
         // Get canvas
         const canvas = document.getElementById('myCanvas')
 
-        // canvas.width = window.innerWidth;
-        // canvas.height = window.innerHeight;
-        // canvasW = canvas.width;
-        // canvasH = canvas.height;
+        // Obtain the graphics context.  If debug=true, use debug
+        let gl;
+        // if (true) {
+        //     gl = WebGLDebugUtils.makeDebugContext(canvas.getContext("webgl2"));
+        //     const ext = gl.getExtension('GMAN_debug_helper');
+        //     if (ext) {
+        //       ext.setConfiguration({
+        //         maxDrawCalls: 2000,
+        //         failUnsetSamplerUniforms: true,
+        //       });
+        //     }
+        // } else {
+            gl = canvas.getContext("webgl2");
+        // }
 
-        const gl = WebGLDebugUtils.makeDebugContext(canvas.getContext("webgl2"));
+        // Create the program for light point of view
+        let lightProgram = createProgram(gl, lightVs, lightFs, false);
 
-        const ext = gl.getExtension('GMAN_debug_helper');
-        if (ext) {
-          ext.setConfiguration({
-            maxDrawCalls: 2000,
-            failUnsetSamplerUniforms: true,
-          });
+        // Create the program for camera point of view
+        let cameraProgram = createProgram(gl, cameraVs, cameraFs, true);
+
+        // Build the molecular model
+        let molecule;
+        if (name === 'helium') {
+            molecule = getHelium();
+        }
+        else if (name === 'water') {
+            molecule = getWater();
+        }
+        else if (name === 'caffeine') {
+            molecule = getCaffeine();
+        }
+        else if (name === 'cortisol') {
+            molecule = getCortisol();
+        }
+        else if (name === 'dna') {
+            molecule = getDna();
+        }
+        else if (name === 'nanotube') {
+            molecule = getNanotube();
+        }
+        else {
+            console.log("Molecule name " + name + " not recognized." );
+            return;
         }
 
-        var vertexShaderSource = `#version 300 es
+        const atomsInstanceSet = getInstanceSet(
+            gl,
+            cameraProgram,
+            molecule.getAtoms(),
+            getUnitSphere(),
+            getUnitSphere(),
+            getSphereTexCoords()
+        );
 
-        // Per vertex attributes
-        in vec3 aVertexPosition;
-        in vec3 aVertexNormal;
+        const bondsInstanceSet = getInstanceSet(
+            gl,
+            cameraProgram,
+            molecule.getBonds(),
+            getCylinder(),
+            getCylinderNormals(),
+            getCylinderTexCoords()
+        );
 
-        // Per-instance attributes
-        in mat4 aModelViewMatrix;
-        in mat3 aNormalMatrix;
-        in vec4 aColor;
+        // Create the frame buffer used to store depths from light point of view
+        const depthTextureSize = 512;
+        const depthTextureInfo = createDepthTexture(gl, depthTextureSize);
 
-        // Uniform attributes
-        uniform mat4 uProjectionMatrix;
+        // Build the perspective distortion for camera point of view.
+        var cameraProjection = glMatrix.mat4.create();
+        glMatrix.mat4.perspective(cameraProjection, Math.PI/4, 1.0, 0.1);
 
-        out vec3 n,l,v;
-        out vec4 color;
+        // Create textures
+        const texture0 = getTexture(gl, 0, "symbols.png", 1024, 1024);
+        const texture1 = getTexture(gl, 1, "stadium sphere.jpg", 256, 256);
+        const texture2 = getTexture(gl, 2, "bumpmap.png", 512, 512);
 
-        void main() {
-            vec4 p = aModelViewMatrix * vec4(aVertexPosition, 1.0);
-
-            // Output vectors will be interpolated across fragments and passed in to fragment shader
-            n = normalize(aNormalMatrix * aVertexNormal);
-            l = normalize(vec3(2.0, 2.0, 2.0));
-            v = normalize(-p.xyz);
-
-            color = aColor;
-
-            gl_Position =  uProjectionMatrix * aModelViewMatrix * vec4(aVertexPosition, 1.0);
-        }
-        `;
-
-        // Create a fragment shader
-        var fragmentShaderSource = `#version 300 es
-          precision mediump float;
-
-          in vec3 n,l,v;
-          in vec4 color;
-          out vec4 outColor;
-
-          void main() {
-//              outColor = color;
-              vec3 nn = normalize(n);
-              vec3 ln = normalize(l);
-              vec3 vn = normalize(v);
-
-              // Ambient light coefficients
-              float kar = 0.4;
-              float kag = 0.4;
-              float kab = 0.4;
-
-              // Diffuse light coefficients
-              float kdr = 0.3;
-              float kdg = 0.3;
-              float kdb = 0.3;
-
-              // Specular light coefficients
-              float ksr = 0.3;
-              float ksg = 0.3;
-              float ksb = 0.3;
-
-              // n dot l / cosine theta for diffuse lighting
-              float diffuse = dot(nn, ln);
-              if (diffuse < 0.0) {
-                  diffuse = 0.0;
-              }
-
-              // Local reflection vector for specular lighting
-              vec3 r = 2.0 * dot(nn, ln) * nn - ln;
-
-              // Calculate dot(vn, r)
-              float vdotr = dot(vn, r);
-              if (vdotr < 0.0) {
-                  vdotr = 0.0;
-              }
-
-              // v dot r to the n / reflection for Phong specular lighting
-              float specular = pow(vdotr, 10.0);
-              if (specular < 0.0) {
-                  specular = 0.0;
-              }
-
-              // Calculate color components using ambient, Lambertian diffuse, and Phong specular models
-              float colorR = kar * color.r + kar * color.r * diffuse + ksr * specular;
-              float colorG = kag * color.g + kag * color.g * diffuse + ksg * specular;
-              float colorB = kab * color.b + kab * color.b * diffuse + ksb * specular;
-
-              outColor = vec4(colorR, colorG, colorB, 1.0);
-            }
-        `;
-
-        // Create the program
-        var shaderProgram = createProgram(gl, vertexShaderSource, fragmentShaderSource);
-
-        const vertexPositionAttribute = gl.getAttribLocation(shaderProgram, "aVertexPosition");
-        const modelViewAttribute = gl.getAttribLocation(shaderProgram, "aModelViewMatrix");
-        const normalAttribute = gl.getAttribLocation(shaderProgram, "aNormalMatrix");
-        const vertexColorAttribute = gl.getAttribLocation(shaderProgram, "aColor");
-        const vertexNormalAttribute = gl.getAttribLocation(shaderProgram, "aVertexNormal");
-        const projectionUniform = gl.getUniformLocation(shaderProgram, "uProjectionMatrix");
-
-        // Build the scene graph
-        const oxygen = getOxygenGraph();
-
-        // Get VAO containing atoms (aka spheres).
-        const numSphereInstances = oxygen.getTreeSize("atom");
-        const modelViewMatrices = new Float32Array(numSphereInstances * 16);
-        const normalMatrices = new Float32Array(numSphereInstances * 9);
-        const matrixBuffer = gl.createBuffer();
-        const normalBuffer = gl.createBuffer();
-        const sphereVertices = getUnitSphereCoords(1.0);
-        const sphereNormals = getUnitSphereCoords(1.0);
-        const sphereVao = getSphereVao();
-
-        // Get VAO containing bonds (aka sticks).
-        const numStickInstances = oxygen.getTreeSize("bond");
-        const stickModelViewMatrices = new Float32Array(numStickInstances * 16);
-        const stickNormalMatrices = new Float32Array(numStickInstances * 9);
-        const stickMatrixBuffer = gl.createBuffer();
-        const stickNormalBuffer = gl.createBuffer();
-        const stickVertices = getCylinder();
-        const stickNormals = getCylinderNormals();
-        const stickVao = getStickVao(gl);
-
-        // Build perspective transform.  This does not change.
-        var projection = glMatrix.mat4.create();
-        glMatrix.mat4.perspective(projection, Math.PI/4, 1.0, 0.1);
+        // For FPS calculation
+        let now = 0;
+        let previous = 0;
+        let frames = 0;
 
         function draw(time) {
-            gl.useProgram(shaderProgram);
-
-            // Clear frame buffer for each frame.
-            gl.clearColor(0.0, 0.0, 0.0, 1.0);
-            gl.clearDepth(1.0);
             gl.enable(gl.DEPTH_TEST);
-            gl.depthFunc(gl.LEQUAL);
-            gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+            gl.enable(gl.CULL_FACE);
 
             // Build view transform, this changes each frame.
             const viewTx = glMatrix.mat4.create();
@@ -319,317 +558,371 @@
             glMatrix.mat4.rotateX(viewTx, viewTx, time * 0.0005);
             glMatrix.mat4.rotateZ(viewTx, viewTx, time * 0.0003);
 
-            // Redraw atoms (spheres)
-            gl.bindVertexArray(sphereVao);
-            updateSphereMatrices(oxygen, viewTx);
-            gl.uniformMatrix4fv(projectionUniform, false, projection);
-            gl.drawArraysInstanced(gl.TRIANGLES, 0, sphereVertices.length / 3, numSphereInstances);
+            // Build projection view matrix from light point of view
+            const lightProjectionMatrix = cameraProjection;
+            const lightViewMatrix = glMatrix.mat4.create();
+            glMatrix.mat4.translate(lightViewMatrix, lightViewMatrix, [0.0, 0.0, -20.0]);
+            glMatrix.mat4.rotateX(lightViewMatrix, lightViewMatrix, glMatrix.glMatrix.toRadian(45));
+            glMatrix.mat4.rotateZ(lightViewMatrix, lightViewMatrix, glMatrix.glMatrix.toRadian(45));
+            glMatrix.mat4.rotateY(lightViewMatrix, lightViewMatrix, time * 0.001);
+            glMatrix.mat4.rotateX(lightViewMatrix, lightViewMatrix, time * 0.0005);
+            glMatrix.mat4.rotateZ(lightViewMatrix, lightViewMatrix, time * 0.0003);
 
-            // Redraw bonds (sticks)
-            gl.bindVertexArray(stickVao);
-            updateStickMatrices(oxygen, viewTx);
-            gl.uniformMatrix4fv(projectionUniform, false, projection);
-            gl.drawArraysInstanced(gl.TRIANGLES, 0, stickVertices.length / 3, numStickInstances);
+            // Draw scene from light point of view and store in depth buffer
+            gl.bindFramebuffer(gl.FRAMEBUFFER, depthTextureInfo.frameBuffer);
+            gl.viewport(0, 0,  depthTextureInfo.textureSize, depthTextureInfo.textureSize);
+            gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+            drawScene(lightProjectionMatrix, lightViewMatrix, null, lightProgram, false, time);
 
-            requestAnimationFrame(draw);
+            // Build combined projection view matrix from light pov for camera scene
+            const lightProjectionViewMatrix = glMatrix.mat4.create();
+            glMatrix.mat4.mul(lightProjectionViewMatrix, lightProjectionMatrix, lightViewMatrix);
+
+            // draw scene from camera point of view and draw to canvas
+            gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+            gl.viewport(0, 0, 800, 800);
+            gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+            drawScene(cameraProjection, viewTx, lightProjectionViewMatrix, cameraProgram, true, time);
+
+            // Calculate FPS
+            now = performance.now();
+            if (now > previous + 1000) {
+
+
+                let triangles = atomsInstanceSet.vertices.length / 3 * atomsInstanceSet.instances.length +
+                                bondsInstanceSet.vertices.length / 3 * bondsInstanceSet.instances.length;
+                setFps("FPS: " + frames
+                  + "  Triangles: " + triangles);
+                frames = 0;
+                previous = now;
+            } else {
+                frames = frames + 1;
+            }
+
+            // Continue with this molecule and program until user clicks the button for another
+            // molecule and changes the global variable moleculeName.
+            if (name === moleculeName) {
+                requestAnimationFrame(draw);
+            }
         }
+
+        function drawScene(projectionMatrix, viewMatrix, lightProjectionViewMatrix, shader, isCameraProgram, time) {
+            gl.useProgram(shader.program);
+
+            // If this is the camera program, bind the textures
+            if (isCameraProgram) {
+                // Bind texture 0 (symbol grid)
+                gl.uniform1i(shader.samplerSymbolGridUniform, 0);
+                gl.activeTexture(gl.TEXTURE0);
+                gl.bindTexture(gl.TEXTURE_2D, texture0);
+
+                // Bind texture 1 (sphere map)
+                gl.uniform1i(shader.samplerSphereUniform, 1);
+                gl.activeTexture(gl.TEXTURE1);
+                gl.bindTexture(gl.TEXTURE_2D, texture1);
+
+                // Bind texture 2 (bump map)
+                gl.uniform1i(shader.samplerBumpUniform, 2);
+                gl.activeTexture(gl.TEXTURE2);
+                gl.bindTexture(gl.TEXTURE_2D, texture2);
+
+                // Bind depth texture
+                gl.uniform1i(shader.lightDepthTextureUniform, 3);
+                gl.activeTexture(gl.TEXTURE3);
+                gl.bindTexture(gl.TEXTURE_2D, depthTextureInfo.depthTexture);
+
+                // Matrix to compute position in light clip coordinates
+                gl.uniformMatrix4fv(shader.lightProjectionViewUniform, false, lightProjectionViewMatrix);
+            }
+
+            // Set projection and view uniforms
+            gl.uniformMatrix4fv(shader.projectionUniform, false, projectionMatrix);
+            gl.uniformMatrix4fv(shader.viewUniform, false, viewMatrix);
+
+            // Redraw atoms (spheres)
+            gl.bindVertexArray(atomsInstanceSet.vao);
+            updateMatrices(gl, atomsInstanceSet, viewMatrix);
+            gl.drawArraysInstanced(gl.TRIANGLES, 0, atomsInstanceSet.vertices.length / 3, atomsInstanceSet.instances.length);
+
+            // Redraw bonds (cylinders)
+            gl.bindVertexArray(bondsInstanceSet.vao);
+            updateMatrices(gl, bondsInstanceSet, viewMatrix);
+            gl.drawArraysInstanced(gl.TRIANGLES, 0, bondsInstanceSet.vertices.length / 3, bondsInstanceSet.instances.length);
+        }
+
 
         requestAnimationFrame(draw);
-
-        function getSphereVao() {
-          // Create the VAO used for multiple ball instances
-          const vao = gl.createVertexArray();
-
-          gl.bindVertexArray(vao); // After binding vao, calls to bindBuffer() and vertexAttribPointer() are "recorded" in the vao.
-
-          // Store instance vertices
-          gl.bindBuffer(gl.ARRAY_BUFFER, gl.createBuffer());
-          gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(sphereVertices), gl.STATIC_DRAW);
-          gl.enableVertexAttribArray(vertexPositionAttribute);
-          gl.vertexAttribPointer(vertexPositionAttribute, 3, gl.FLOAT, false, 0, 0);
-
-          // Store instance normals
-          gl.bindBuffer(gl.ARRAY_BUFFER, gl.createBuffer());
-          gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(sphereNormals), gl.STATIC_DRAW);
-          gl.enableVertexAttribArray(vertexNormalAttribute);
-          gl.vertexAttribPointer(vertexNormalAttribute, 3, gl.FLOAT, false, 0, 0);
-
-
-          // Construct single array containing the model matrix for each instance.
-          const matrixIndices = [];
-          for (let i = 0; i < numSphereInstances; i++) {
-            const byteOffsetToMatrix = i * 16 * 4;
-            const numFloatsForView = 16;
-            matrixIndices.push(new Float32Array(
-                modelViewMatrices.buffer,
-                byteOffsetToMatrix,
-                numFloatsForView));
-          }
-
-          // Create a buffer to hold modelViewMatrices, but don't upload data yet.
-          // The data will be uploaded in the draw() function once we compute the
-          // view matrix.
-          gl.bindBuffer(gl.ARRAY_BUFFER, matrixBuffer);
-          gl.bufferData(gl.ARRAY_BUFFER, modelViewMatrices.byteLength, gl.DYNAMIC_DRAW);
-
-          // The setup of the model matrix attribute from webgl2fundamentals.org
-          const bytesPerMatrix = 4 * 16;
-          for (let i = 0; i < 4; ++i) {
-            const loc = modelViewAttribute + i;
-            gl.enableVertexAttribArray(loc);
-            // note the stride and offset
-            const offset = i * 16;  // 4 floats per row, 4 bytes per float
-            gl.vertexAttribPointer(
-                loc,              // location
-                4,                // size (num values to pull from buffer per iteration)
-                gl.FLOAT,         // type of data in buffer
-                false,            // normalize
-                bytesPerMatrix,   // stride, num bytes to advance to get to next set of values
-                offset,           // offset in buffer
-            );
-            // this line says this attribute only changes for each 1 instance
-            gl.vertexAttribDivisor(loc, 1);
-          }
-
-          // Construct an array containing color vec4 for each instance.
-          const colorVecs = new Float32Array(numSphereInstances * 4);
-          oxygen.traverse("atom", function (node, nodeNum) {
-              const color = node.getColor();
-
-              // Write the color information into colorVecs
-              for (let i = 0; i < 4; i++) {
-                  const offset = nodeNum * 4 + i;
-                  colorVecs[offset] = color[i];
-              }
-          });
-
-          // Create a buffer to hold normal matrices, but don't upload data yet.
-          // The data will be uploaded in the draw() function once we compute the
-          // view matrix.
-          gl.bindBuffer(gl.ARRAY_BUFFER, normalBuffer);
-          gl.bufferData(gl.ARRAY_BUFFER, normalMatrices.byteLength, gl.DYNAMIC_DRAW);
-
-          // The setup of the normal matrix attribute from webgl2fundamentals.org
-          const bytesPerNormalMatrix = 4 * 9; // 4 bytes per float by 9 matrix elements
-          for (let i = 0; i < 3; ++i) {
-            const loc = normalAttribute + i;
-            gl.enableVertexAttribArray(loc);
-            // note the stride and offset
-            const offset = i * 12;  // 12 bytes per matrix row
-            gl.vertexAttribPointer(
-                loc,                    // location
-                3,                      // size (num values to pull from buffer per iteration)
-                gl.FLOAT,               // type of data in buffer
-                false,                  // normalize
-                bytesPerNormalMatrix,   // stride, num bytes to advance to get to next set of values
-                offset,                 // offset in bytes to first element
-            );
-            // this line says this attribute only changes for each 1 instance
-            gl.vertexAttribDivisor(loc, 1);
-          }
-
-          // Create a buffer and store colors array in it.  Recorded in vao.
-          gl.bindBuffer(gl.ARRAY_BUFFER, gl.createBuffer());
-          gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(colorVecs), gl.STATIC_DRAW);
-
-          // The setup of the color attribute
-          const bytesPerVector = 4 * 4;
-          const loc = vertexColorAttribute;
-          gl.enableVertexAttribArray(loc);
-          // note the stride and offset
-          gl.vertexAttribPointer(
-              loc,              // location
-              4,                // size (num values to pull from buffer per iteration)
-              gl.FLOAT,         // type of data in buffer
-              false,            // normalize
-              bytesPerVector,   // stride, num bytes to advance to get to next color vector
-              0                 // offset in buffer to first color vector
-          );
-          // this line says this attribute only changes for each 1 instance
-          gl.vertexAttribDivisor(loc, 1);
-
-          return vao;
-        }
-
-        function getStickVao(gl) {
-          // Create the VAO used for multiple ball instances
-          const vao = gl.createVertexArray();
-
-          gl.bindVertexArray(vao); // After binding vao, calls to bindBuffer() and vertexAttribPointer() are "recorded" in the vao.
-
-          // Store instance vertices
-          gl.bindBuffer(gl.ARRAY_BUFFER, gl.createBuffer());
-          gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(stickVertices), gl.STATIC_DRAW);
-          gl.enableVertexAttribArray(vertexPositionAttribute);
-          gl.vertexAttribPointer(vertexPositionAttribute, 3, gl.FLOAT, false, 0, 0);
-
-          // Store instance normals
-          gl.bindBuffer(gl.ARRAY_BUFFER, gl.createBuffer());
-          gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(stickNormals), gl.STATIC_DRAW);
-          gl.enableVertexAttribArray(vertexNormalAttribute);
-          gl.vertexAttribPointer(vertexNormalAttribute, 3, gl.FLOAT, false, 0, 0);
-
-
-          // Construct single array containing the model matrix for each instance.
-          // const matrixIndices = [];
-          // for (let i = 0; i < numSphereInstances; i++) {
-          //   const byteOffsetToMatrix = i * 16 * 4;
-          //   const numFloatsForView = 16;
-          //   matrixIndices.push(new Float32Array(
-          //       modelViewMatrices.buffer,
-          //       byteOffsetToMatrix,
-          //       numFloatsForView));
-          // }
-
-          // Create a buffer to hold modelViewMatrices, but don't upload data yet.
-          // The data will be uploaded in the draw() function once we compute the
-          // view matrix.
-          gl.bindBuffer(gl.ARRAY_BUFFER, stickMatrixBuffer);
-          gl.bufferData(gl.ARRAY_BUFFER, stickModelViewMatrices.byteLength, gl.DYNAMIC_DRAW);
-
-          // The setup of the model matrix attribute from webgl2fundamentals.org
-          const bytesPerMatrix = 4 * 16;
-          for (let i = 0; i < 4; ++i) {
-            const loc = modelViewAttribute + i;
-            gl.enableVertexAttribArray(loc);
-            // note the stride and offset
-            const offset = i * 16;  // 4 floats per row, 4 bytes per float
-            gl.vertexAttribPointer(
-                loc,              // location
-                4,                // size (num values to pull from buffer per iteration)
-                gl.FLOAT,         // type of data in buffer
-                false,            // normalize
-                bytesPerMatrix,   // stride, num bytes to advance to get to next set of values
-                offset,           // offset in buffer
-            );
-            // this line says this attribute only changes for each 1 instance
-            gl.vertexAttribDivisor(loc, 1);
-          }
-
-          // Construct an array containing color vec4 for each instance.
-          const colorVecs = new Float32Array(numStickInstances * 4);
-          oxygen.traverse("bond", function (node, nodeNum) {
-              const color = node.getColor();
-
-              // Write the color information into colorVecs
-              for (let i = 0; i < 4; i++) {
-                  const offset = nodeNum * 4 + i;
-                  colorVecs[offset] = color[i];
-              }
-          });
-
-          // Create a buffer to hold normal matrices, but don't upload data yet.
-          // The data will be uploaded in the draw() function once we compute the
-          // view matrix.
-          gl.bindBuffer(gl.ARRAY_BUFFER, stickNormalBuffer);
-          gl.bufferData(gl.ARRAY_BUFFER, stickNormalMatrices.byteLength, gl.DYNAMIC_DRAW);
-
-          // The setup of the normal matrix attribute from webgl2fundamentals.org
-          const bytesPerNormalMatrix = 4 * 9; // 4 bytes per float by 9 matrix elements
-          for (let i = 0; i < 3; ++i) {
-            const loc = normalAttribute + i;
-            gl.enableVertexAttribArray(loc);
-            // note the stride and offset
-            const offset = i * 12;  // 12 bytes per matrix row
-            gl.vertexAttribPointer(
-                loc,                    // location
-                3,                      // size (num values to pull from buffer per iteration)
-                gl.FLOAT,               // type of data in buffer
-                false,                  // normalize
-                bytesPerNormalMatrix,   // stride, num bytes to advance to get to next set of values
-                offset,                 // offset in bytes to first element
-            );
-            // this line says this attribute only changes for each 1 instance
-            gl.vertexAttribDivisor(loc, 1);
-          }
-
-          // Create a buffer and store colors array in it.  Recorded in vao.
-          gl.bindBuffer(gl.ARRAY_BUFFER, gl.createBuffer());
-          gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(colorVecs), gl.STATIC_DRAW);
-
-          // The setup of the color attribute
-          const bytesPerVector = 4 * 4;
-          const loc = vertexColorAttribute;
-          gl.enableVertexAttribArray(loc);
-          // note the stride and offset
-          gl.vertexAttribPointer(
-              loc,              // location
-              4,                // size (num values to pull from buffer per iteration)
-              gl.FLOAT,         // type of data in buffer
-              false,            // normalize
-              bytesPerVector,   // stride, num bytes to advance to get to next color vector
-              0                 // offset in buffer to first color vector
-          );
-          // this line says this attribute only changes for each 1 instance
-          gl.vertexAttribDivisor(loc, 1);
-
-          return vao;
-        }
-
-        function updateSphereMatrices(root, viewTx) {
-              // For each frame, traverse the scene graph and compute new modelView matrix for each node.
-              root.traverse("atom", function (node, nodeNum) {
-                  const modelTx = node.getModelTx();
-
-                  // Set up model-view transform
-                  const model = node.getAbsoluteModelTx();
-                  const modelView = glMatrix.mat4.create();
-                  glMatrix.mat4.mul(modelView, viewTx, modelTx);
-
-                  // Update the modelView matrix based on new time
-                  const stride = 4 * 4;
-                  modelViewMatrices.set(modelView, stride * nodeNum);
-
-                  // Update the normal matrix
-                  var normalMatrix = glMatrix.mat3.create();
-                  glMatrix.mat3.normalFromMat4(normalMatrix, modelView);
-                  const normalStride = 3 * 3;
-                  normalMatrices.set(normalMatrix, normalStride * nodeNum);
-              });
-
-              // upload the new modelView matrix data
-              gl.bindBuffer(gl.ARRAY_BUFFER, matrixBuffer);
-              gl.bufferSubData(gl.ARRAY_BUFFER, 0, modelViewMatrices);
-
-              // Upload new normal matrix data
-              gl.bindBuffer(gl.ARRAY_BUFFER, normalBuffer);
-              gl.bufferSubData(gl.ARRAY_BUFFER, 0, normalMatrices);
-
-        }
-
-        function updateStickMatrices(root, viewTx) {
-              // For each frame, traverse the scene graph and compute new modelView matrix for each node.
-              root.traverse("bond", function (node, nodeNum) {
-                  const modelTx = node.getModelTx();
-
-                  // Set up model-view transform
-                  const model = node.getAbsoluteModelTx();
-                  const modelView = glMatrix.mat4.create();
-                  glMatrix.mat4.mul(modelView, viewTx, modelTx);
-
-                  // Update the modelView matrix based on new time
-                  const stride = 4 * 4;
-                  stickModelViewMatrices.set(modelView, stride * nodeNum);
-
-                  // Update the normal matrix
-                  var normalMatrix = glMatrix.mat3.create();
-                  glMatrix.mat3.normalFromMat4(normalMatrix, modelView);
-                  const normalStride = 3 * 3;
-                  stickNormalMatrices.set(normalMatrix, normalStride * nodeNum);
-              });
-
-              // upload the new modelView matrix data
-              gl.bindBuffer(gl.ARRAY_BUFFER, stickMatrixBuffer);
-              gl.bufferSubData(gl.ARRAY_BUFFER, 0, stickModelViewMatrices);
-
-              // Upload new normal matrix data
-              gl.bindBuffer(gl.ARRAY_BUFFER, stickNormalBuffer);
-              gl.bufferSubData(gl.ARRAY_BUFFER, 0, stickNormalMatrices);
-
-        }
       }
 
-      function getUnitSphereCoords(scale) {
+      function getInstanceSet(gl, shaderProgram, instances, vertices, normals, texCoords) {
+          const numInstances = instances.length;
+
+          // Array to hold model matrices (16 floats per matrix)
+          const modelMatrices = new Float32Array(numInstances * 16);
+
+          // Array to hold normal matrices (9 floats per matrix)
+          const normalMatrices = new Float32Array(numInstances * 9);
+
+          // Create the VAO
+          const vao = gl.createVertexArray();
+
+          gl.bindVertexArray(vao);
+
+          // Store instance vertices
+          gl.bindBuffer(gl.ARRAY_BUFFER, gl.createBuffer());
+          gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(vertices), gl.STATIC_DRAW);
+          gl.enableVertexAttribArray(shaderProgram.vertexPositionAttribute);
+          gl.vertexAttribPointer(shaderProgram.vertexPositionAttribute, 3, gl.FLOAT, false, 0, 0);
+
+          // Store instance normals
+          gl.bindBuffer(gl.ARRAY_BUFFER, gl.createBuffer());
+          gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(normals), gl.STATIC_DRAW);
+          gl.enableVertexAttribArray(shaderProgram.vertexNormalAttribute);
+          gl.vertexAttribPointer(shaderProgram.vertexNormalAttribute, 3, gl.FLOAT, false, 0, 0);
+
+          // Store instance texture coords
+          gl.bindBuffer(gl.ARRAY_BUFFER, gl.createBuffer());
+          gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(texCoords), gl.STATIC_DRAW);
+          gl.enableVertexAttribArray(shaderProgram.vertexTextureAttribute);
+          gl.vertexAttribPointer(shaderProgram.vertexTextureAttribute, 2, gl.FLOAT, false, 0, 0);
+
+          // Create a buffer to hold model matrices.  Will need to reference buffer later.
+          const matrixBuffer = gl.createBuffer();
+          gl.bindBuffer(gl.ARRAY_BUFFER, matrixBuffer);
+          gl.bufferData(gl.ARRAY_BUFFER, modelMatrices.byteLength, gl.DYNAMIC_DRAW);
+
+          // The setup of the model matrix attribute from webgl2fundamentals.org
+          const bytesPerMatrix = 4 * 16;
+          for (let i = 0; i < 4; ++i) {
+            const loc = shaderProgram.modelAttribute + i;
+            gl.enableVertexAttribArray(loc);
+            // note the stride and offset
+            const offset = i * 16;  // 4 floats per row, 4 bytes per float
+            gl.vertexAttribPointer(
+                loc,              // location
+                4,                // size (num values to pull from buffer per iteration)
+                gl.FLOAT,         // type of data in buffer
+                false,            // normalize
+                bytesPerMatrix,   // stride, num bytes to advance to get to next set of values
+                offset,           // offset in buffer
+            );
+
+            // this line says this attribute only changes for each 1 instance
+            gl.vertexAttribDivisor(loc, 1);
+        }
+
+        // Create a buffer to hold normal matrices, but don't upload data yet.
+        // The data will be uploaded in the draw() function once we compute the
+        // view matrix.
+        const normalBuffer = gl.createBuffer();
+        gl.bindBuffer(gl.ARRAY_BUFFER, normalBuffer);
+        gl.bufferData(gl.ARRAY_BUFFER, normalMatrices.byteLength, gl.DYNAMIC_DRAW);
+
+        // The setup of the normal matrix attribute from webgl2fundamentals.org
+        const bytesPerNormalMatrix = 4 * 9; // 4 bytes per float by 9 matrix elements
+        for (let i = 0; i < 3; ++i) {
+          const loc = shaderProgram.normalAttribute + i;
+          gl.enableVertexAttribArray(loc);
+          // note the stride and offset
+          const offset = i * 12;  // 12 bytes per matrix row
+          gl.vertexAttribPointer(
+              loc,                    // location
+              3,                      // size (num values to pull from buffer per iteration)
+              gl.FLOAT,               // type of data in buffer
+              false,                  // normalize
+              bytesPerNormalMatrix,   // stride, num bytes to advance to get to next set of values
+              offset,                 // offset in bytes to first element
+          );
+          // this line says this attribute only changes for each 1 instance
+          gl.vertexAttribDivisor(loc, 1);
+        }
+
+        //Build an array containing color of each instance.
+        const colorVecs = new Float32Array(numInstances * 4);
+        for (let i = 0; i < numInstances; i++) {
+            const instance = instances[i];
+            const color = instance.getColor();
+
+            // Write the color information into colorVecs
+            for (let j = 0; j < 4; j++) {
+                const offset = i * 4 + j;
+                colorVecs[offset] = color[j];
+            }
+        };
+
+        // Put color array into buffer and associated with per-instance attribute.
+        createPerInstanceBuffer(gl, colorVecs, shaderProgram.vertexColorAttribute, 4, 4 * 4);
+
+        // Build arrays containing per-instance offsets into the symbol grid.
+        const texOffsets = new Float32Array(numInstances * 2);
+        for (let i = 0; i < numInstances; i++) {
+            const instance = instances[i];
+            const symbol = instance.getSymbol();
+
+            let val0;
+            let offsetY;
+
+            if (symbol === "H") {
+                offsetX = 0.0;
+                offsetY = 0.0;
+            } else if (symbol === "C") {
+                offsetX = 0.25;
+                offsetY = 0.0;
+            } else if (symbol === "P") {
+                offsetX = 0.5;
+                offsetY = 0.0;
+            } else if (symbol === "He") {
+                offsetX = 0.75;
+                offsetY = 0.0;
+            } else if (symbol === "N") {
+                offsetX = 0.0;
+                offsetY = 0.25;
+            } else if (symbol === "O") {
+                offsetX = 0.25;
+                offsetY = 0.25;
+            } else {
+                offsetX = 0.5;
+                offsetY = 0.25;
+            }
+
+            texOffsets[i*2] = offsetX;
+            texOffsets[i*2+1] = offsetY;
+        };
+
+        // Put color array into buffer and associated with per-instance attribute.
+        createPerInstanceBuffer(gl, texOffsets, shaderProgram.instanceTexOffsetAttribute, 2, 4 * 2);
+
+        return {
+            vao: vao,
+            instances: instances,
+            modelMatrices: modelMatrices,
+            normalMatrices: normalMatrices,
+            vertices: vertices,
+            normals: normals,
+            texCoords: texCoords,
+            matrixBuffer: matrixBuffer,
+            normalBuffer: normalBuffer
+        };
+      }
+
+
+      function updateMatrices(gl, instanceSet, viewTx) {
+          for (let i = 0; i < instanceSet.instances.length; i++) {
+              const instance = instanceSet.instances[i];
+              let modelMatrix = instance.getModelMatrix();
+
+              // Update the model matrix.  Maybe can skip this since view transform separate?
+              const stride = 4 * 4;
+              instanceSet.modelMatrices.set(modelMatrix, stride * i);
+
+              // Update the normal matrix
+              let modelViewMatrix = glMatrix.mat4.create();
+              glMatrix.mat4.mul(modelViewMatrix, modelViewMatrix, modelMatrix);
+              glMatrix.mat4.mul(modelViewMatrix, viewTx, modelViewMatrix);
+              var normalMatrix = glMatrix.mat3.create();
+              glMatrix.mat3.normalFromMat4(normalMatrix, modelViewMatrix);
+              const normalStride = 3 * 3;
+              instanceSet.normalMatrices.set(normalMatrix, normalStride * i);
+          }
+
+          // upload the new modelView matrix data
+          gl.bindBuffer(gl.ARRAY_BUFFER, instanceSet.matrixBuffer);
+          gl.bufferSubData(gl.ARRAY_BUFFER, 0, instanceSet.modelMatrices);
+
+          // Upload new normal matrix data
+          gl.bindBuffer(gl.ARRAY_BUFFER, instanceSet.normalBuffer);
+          gl.bufferSubData(gl.ARRAY_BUFFER, 0, instanceSet.normalMatrices);
+      }
+
+
+      function getTexture(gl, samplerNum, filename, width, height) {
+          const texture = gl.createTexture();
+          gl.bindTexture(gl.TEXTURE_2D, texture);
+          var sampler = gl.createSampler();
+          gl.bindSampler(samplerNum, sampler);
+
+          // load texture image using webgl2fundamentals boilerplate
+          // initially creates just a 1x1 blue pixel as a placeholder
+          // replaced by actual texture image once loaded
+          gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 1, 1, 0, gl.RGBA,
+                        gl.UNSIGNED_BYTE, new Uint8Array([0, 0, 255, 255]));
+
+          var image = new Image();
+          image.src = filename;
+
+          image.addEventListener("load", function() {
+            gl.bindTexture(gl.TEXTURE_2D, texture);
+            gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, width, height, 0, gl.RGBA, gl.UNSIGNED_BYTE, image);
+            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_LINEAR);
+            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+
+            gl.generateMipmap(gl.TEXTURE_2D);
+          });
+
+          return texture;
+      }
+
+      function createPerInstanceBuffer(gl, data, attribute, size, stride) {
+          gl.bindBuffer(gl.ARRAY_BUFFER, gl.createBuffer());
+          gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(data), gl.STATIC_DRAW);
+
+          // Set up attribute
+          const loc = attribute;
+          gl.enableVertexAttribArray(loc);
+          // note the stride and offset
+          gl.vertexAttribPointer(
+              loc,              // location
+              size,                // size (num values to pull from buffer per iteration)
+              gl.FLOAT,         // type of data in buffer
+              false,            // normalize
+              stride,           // stride, num bytes to advance to get to next weight
+              0                 // offset in buffer to first weight
+          );
+
+          // this line says this attribute only changes for each 1 instance
+          gl.vertexAttribDivisor(loc, 1);
+      }
+
+      // This code to create depth texture from:
+      // https://webgl2fundamentals.org/webgl/lessons/webgl-shadows.html
+      function createDepthTexture(gl, depthTextureSize, samplerNum) {
+        const depthTexture = gl.createTexture();
+        gl.bindTexture(gl.TEXTURE_2D, depthTexture);
+        gl.texImage2D(
+            gl.TEXTURE_2D,      // target
+            0,                  // mip level
+            gl.DEPTH_COMPONENT32F, // internal format
+            depthTextureSize,   // width
+            depthTextureSize,   // height
+            0,                  // border
+            gl.DEPTH_COMPONENT, // format
+            gl.FLOAT,           // type
+            null);              // data
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+
+        const depthFramebuffer = gl.createFramebuffer();
+        gl.bindFramebuffer(gl.FRAMEBUFFER, depthFramebuffer);
+        gl.framebufferTexture2D(
+            gl.FRAMEBUFFER,       // target
+            gl.DEPTH_ATTACHMENT,  // attachment point
+            gl.TEXTURE_2D,        // texture target
+            depthTexture,         // texture
+            0);                   // mip level
+
+        return {
+          depthTexture: depthTexture,
+          frameBuffer: depthFramebuffer,
+          textureSize: depthTextureSize
+        };
+      }
+
+      function getUnitSphere() {
+        const scale = 1.0;
 
         var coords = [25 * 13 * 3]
         var lMultiplier = 2 * Math.PI / 24;
@@ -672,59 +965,35 @@
         return triangles;
       }
 
-    // function getCylinder() {
+      function getSphereTexCoords() {
+        var triangles = [];
 
-    //     var coords = [25 * 13 * 3];
-    //     var lMultiplier = 2 * Math.PI / 24;
-    //     var mMultiplier = 2 * Math.PI / 24;
-    //     for (var l = 0; l <25; l++) {
-    //         var lRads = l * lMultiplier;
-    //         for (var m = -6; m < 7; m++) {
-    //             var x;
-    //             var y;
-    //             var z;
-    //             if ((m === -6) || (m === 6)) {
-    //                 x = 0;
-    //                 y = 0;
-    //                 if (m === -6) {
-    //                     z = -1.0;
-    //                 } else {
-    //                     z = 1.0;
-    //                 }
-    //             } else {
-    //                 x = Math.cos(lRads);
-    //                 y = Math.sin(lRads);
-    //                 z = m / 5.0;
-    //             }
-    //             coords[l * 13 * 3 + (m + 6) * 3 + 0] = x;
-    //             coords[l * 13 * 3 + (m + 6) * 3 + 1] = y;
-    //             coords[l * 13 * 3 + (m + 6) * 3 + 2] = z;
-    //         }
-    //     }
+        for (let l = 0; l <24; l++) {
+            for (let m = 0; m < 12; m++) {
+                let sLeft = l / 24.0;
+                let sRight = (l + 1) / 24.0;
+                let tBottom = m / 12.0;
+                let tTop = (m + 1) / 12.0;
 
-    //     var triangles = [];
+                var ll = [sLeft, tBottom];
+                var lr = [sRight, tBottom];
+                var ul = [sLeft, tTop];
+                var ur = [sRight, tTop];
 
-    //     for (l = 0; l <24; l++) {
-    //         for (var m = 0; m < 12; m++) {
-    //             var ll = coords.slice( l      * 13 * 3 +  m      * 3,  l      * 13 * 3 +  m      * 3 + 3);
-    //             var lr = coords.slice((l + 1) * 13 * 3 +  m      * 3, (l + 1) * 13 * 3 +  m      * 3 + 3);
-    //             var ul = coords.slice( l      * 13 * 3 + (m + 1) * 3,  l      * 13 * 3 + (m + 1) * 3 + 3);
-    //             var ur = coords.slice((l + 1) * 13 * 3 + (m + 1) * 3, (l + 1) * 13 * 3 + (m + 1) * 3 + 3);
+                // Push first of two triangles
+                triangles.push(...ll);
+                triangles.push(...lr);
+                triangles.push(...ur);
 
-    //             // Push first of two triangles
-    //             triangles.push(...ll);
-    //             triangles.push(...lr);
-    //             triangles.push(...ur);
+                // Push second of two triangles
+                triangles.push(...ul);
+                triangles.push(...ll);
+                triangles.push(...ur);
+            }
+        }
 
-    //             // Push second of two triangles
-    //             triangles.push(...ul);
-    //             triangles.push(...ll);
-    //             triangles.push(...ur);
-    //         }
-    //     }
-
-    //     return triangles;
-    //   }
+        return triangles;
+      }
 
 
     function getCylinder() {
@@ -772,13 +1041,13 @@
 
                 // Push first of two triangles
                 triangles.push(...ll);
-                triangles.push(...lr);
                 triangles.push(...ur);
+                triangles.push(...lr);
 
                 // Push second of two triangles
                 triangles.push(...ul);
-                triangles.push(...ll);
                 triangles.push(...ur);
+                triangles.push(...ll);
             }
         }
 
@@ -845,10 +1114,41 @@
                 }
                 // Push normals for first of two triangles
                 triangles.push(...ll);
+                triangles.push(...ur);
+                triangles.push(...lr);
+
+                // Push normals for second of two triangles
+                triangles.push(...ul);
+                triangles.push(...ur);
+                triangles.push(...ll);
+            }
+        }
+
+        return triangles;
+      }
+
+
+      function getCylinderTexCoords() {
+        var triangles = [];
+
+        for (let l = 0; l <24; l++) {
+            for (let m = 0; m < 3; m++) {
+                let sLeft = l / 24.0;
+                let sRight = (l + 1) / 24.0;
+                let tBottom = m / 3.0;
+                let tTop = (m + 1) / 3.0;
+
+                var ll = [sLeft, tBottom];
+                var lr = [sRight, tBottom];
+                var ul = [sLeft, tTop];
+                var ur = [sRight, tTop];
+
+                // Push first of two triangles
+                triangles.push(...ll);
                 triangles.push(...lr);
                 triangles.push(...ur);
 
-                // Push normals for second of two triangles
+                // Push second of two triangles
                 triangles.push(...ul);
                 triangles.push(...ll);
                 triangles.push(...ur);
@@ -857,7 +1157,9 @@
 
         return triangles;
       }
-      function createProgram(gl, vertexShaderSource, fragmentShaderSource) {
+
+
+      function createProgram(gl, vertexShaderSource, fragmentShaderSource, isCameraProgram) {
         // Compile vertex shader
         var vertexShader = gl.createShader(gl.VERTEX_SHADER);
         gl.shaderSource(vertexShader, vertexShaderSource);
@@ -881,6 +1183,13 @@
         var shaderProgram = gl.createProgram();
         gl.attachShader(shaderProgram, vertexShader);
         gl.attachShader(shaderProgram, fragmentShader);
+        gl.bindAttribLocation(shaderProgram, 0, "aVertexPosition");
+        gl.bindAttribLocation(shaderProgram, 1, "aVertexNormal");
+        gl.bindAttribLocation(shaderProgram, 2, "aTexCoord");
+        gl.bindAttribLocation(shaderProgram, 3, "aModelMatrix"); // mat4 consumes 4 location numbers
+        gl.bindAttribLocation(shaderProgram, 7, "aNormalMatrix"); // mat3 consumes 3 location numbers
+        gl.bindAttribLocation(shaderProgram, 10, "aColor");
+        gl.bindAttribLocation(shaderProgram, 11, "aTexOffset");
         gl.linkProgram(shaderProgram);
         if (! gl.getProgramParameter(shaderProgram, gl.LINK_STATUS)) {
             console.log("Failed to link program.");
@@ -894,69 +1203,1302 @@
             return;
         }
 
-        return shaderProgram;
+        // Per-vertex attributes
+        const vertexPositionAttribute = gl.getAttribLocation(shaderProgram, "aVertexPosition");
+        const vertexNormalAttribute = gl.getAttribLocation(shaderProgram, "aVertexNormal");
+        const vertexTextureAttribute = gl.getAttribLocation(shaderProgram, "aTexCoord");
+
+        // Per-instance attributes
+        const modelAttribute = gl.getAttribLocation(shaderProgram, "aModelMatrix");
+        const normalAttribute = gl.getAttribLocation(shaderProgram, "aNormalMatrix");
+        const vertexColorAttribute = gl.getAttribLocation(shaderProgram, "aColor");
+        const instanceTexOffsetAttribute = gl.getAttribLocation(shaderProgram, "aTexOffset");
+
+        // Uniforms
+        const projectionUniform = gl.getUniformLocation(shaderProgram, "uProjectionMatrix");
+        const viewUniform = gl.getUniformLocation(shaderProgram, "uViewMatrix");
+
+        // Only the camera FS has these uniforms
+        let samplerSymbolGridUniform = undefined;
+        let sampler1Uniform = undefined;
+        let samplerSphereUniform = undefined;
+        let samplerBumpUniform = undefined;
+        let lightDepthTextureUniform = undefined;
+        let lightProjectionViewUniform = undefined;
+        if (isCameraProgram) {
+            lightProjectionViewUniform = gl.getUniformLocation(shaderProgram, "uLightProjectionViewMatrix");
+            samplerSymbolGridUniform = gl.getUniformLocation(shaderProgram, "uSymbolGrid");
+            samplerSphereUniform = gl.getUniformLocation(shaderProgram, "uSamplerSphereMap");
+            samplerBumpUniform = gl.getUniformLocation(shaderProgram, "uSamplerBumpMap");
+            lightDepthTextureUniform = gl.getUniformLocation(shaderProgram, "uLightDepthTexture");
+        }
+
+        return {
+          program: shaderProgram,
+          vertexPositionAttribute: vertexPositionAttribute,
+          vertexNormalAttribute: vertexNormalAttribute,
+          vertexTextureAttribute: vertexTextureAttribute,
+          modelAttribute: modelAttribute,
+          normalAttribute: normalAttribute,
+          vertexColorAttribute: vertexColorAttribute,
+          instanceTexOffsetAttribute: instanceTexOffsetAttribute,
+          projectionUniform: projectionUniform,
+          viewUniform: viewUniform,
+          lightProjectionViewUniform: lightProjectionViewUniform,
+          samplerSymbolGridUniform: samplerSymbolGridUniform,
+          samplerSphereUniform: samplerSphereUniform,
+          samplerBumpUniform: samplerBumpUniform,
+          lightDepthTextureUniform: lightDepthTextureUniform
+        };
       }
 
-      function getOxygenGraph() {
-          // Create root node with oxygen molecule
-          const oxygen = new SceneNode();
-          oxygen.setSize(1.0);
-          oxygen.setType("atom");
-          oxygen.setColorByName("red");
+      function getWater() {
+          const water = new Molecule();
 
-          // Create first child node with hydrogen
-          const hydrogen1 = new SceneNode();
-          hydrogen1.setSize(0.7);
-          hydrogen1.setType("atom");
-          hydrogen1.setColorByName("white");
-          const h1Model = glMatrix.mat4.create();
-          glMatrix.mat4.rotateY(h1Model, h1Model, glMatrix.glMatrix.toRadian(-55.0));
-          glMatrix.mat4.translate(h1Model, h1Model, [0.0, 0.0, 4.0]);
-          hydrogen1.setModelTx(h1Model);
-          oxygen.addChild(hydrogen1);
-          hydrogen1.setParent(oxygen);
+          const oxygenAtom = new Atom(0.0, 0.0, 0.0, "O");
+          const hydrogen1Atom = new Atom(3.0, 0.0, 3.0, "H");
+          const hydrogen2Atom = new Atom(3.0, 0.0, -3.0, "H");
 
-          // Create second child node with hydrogen/oxygen bond
-          const bond1 = new SceneNode();
-          bond1.setType("bond");
-          bond1.setColorByName("grey");
-          const b1Model = glMatrix.mat4.create();
-          glMatrix.mat4.rotateY(b1Model, b1Model, glMatrix.glMatrix.toRadian(-55.0));
-          glMatrix.mat4.translate(b1Model, b1Model, [0.0, 0.0, 2.0]);
-          glMatrix.mat4.scale(b1Model, b1Model, [0.25, 0.25, 2.0]);
-          bond1.setModelTx(b1Model);
-          oxygen.addChild(bond1);
-          bond1.setParent(oxygen);
+          water.addAtom(oxygenAtom);
+          water.addAtom(hydrogen1Atom);
+          water.addAtom(hydrogen2Atom);
 
-          // Create third child node with hydrogen atom
-          const hydrogen2 = new SceneNode();
-          hydrogen2.setSize(0.7);
-          hydrogen2.setType("atom");
-          hydrogen2.setColorByName("white");
-          const h2Model = glMatrix.mat4.create();
-          glMatrix.mat4.rotateY(h2Model, h2Model, glMatrix.glMatrix.toRadian(55));
-          glMatrix.mat4.translate(h2Model, h2Model, [0.0, 0.0, 4.0]);
-          hydrogen2.setModelTx(h2Model);
-          oxygen.addChild(hydrogen2);
-          hydrogen2.setParent(oxygen);
+          const bond1 = new Bond(oxygenAtom, hydrogen1Atom, 0.3);
+          const bond2 = new Bond(oxygenAtom, hydrogen2Atom, 0.3);
 
-          // Create fourth child node with hydrogen/oxygen bond
-          const bond2 = new SceneNode();
-          bond2.setType("bond");
-          bond2.setColorByName("grey");
-          const b2Model = glMatrix.mat4.create();
-          glMatrix.mat4.rotateY(b2Model, b2Model, glMatrix.glMatrix.toRadian(55.0));
-          glMatrix.mat4.translate(b2Model, b2Model, [0.0, 0.0, 2.0]);
-          glMatrix.mat4.scale(b2Model, b2Model, [0.25, 0.25, 2.0]);
-          bond2.setModelTx(b2Model);
-          oxygen.addChild(bond2);
-          bond2.setParent(oxygen);
+          water.addBond(bond1);
+          water.addBond(bond2);
 
-
-
-          return oxygen;
+          return water;
       }
+
+
+      function getHelium() {
+          const helium = new Molecule();
+
+          helium.addAtom(new Atom(0.0, 0.0, 0.0, "He"));
+          helium.center();
+          helium.setScale(4.0);
+
+          return helium;
+      }
+
+      function getCaffeine() {
+          const caffeine = new Molecule();
+
+          caffeine.addAtom(new Atom( 0.4700,  2.5688,  0.0006, "O"));
+          caffeine.addAtom(new Atom(-3.1271, -0.4436, -0.0003, "O"));
+          caffeine.addAtom(new Atom(-0.9686, -1.3125,  0.0000, "N"));
+          caffeine.addAtom(new Atom( 2.2182,  0.1412, -0.0003, "N"));
+          caffeine.addAtom(new Atom(-1.3477,  1.0797, -0.0001, "N"));
+          caffeine.addAtom(new Atom( 1.4119, -1.9372,  0.0002, "N"));
+          caffeine.addAtom(new Atom( 0.8579,  0.2592, -0.0008, "C"));
+          caffeine.addAtom(new Atom( 0.3897, -1.0264, -0.0004, "C"));
+          caffeine.addAtom(new Atom( 0.0307,  1.4220, -0.0006, "C"));
+          caffeine.addAtom(new Atom(-1.9061, -0.2495, -0.0004, "C"));
+          caffeine.addAtom(new Atom( 2.5032, -1.1998,  0.0003, "C"));
+          caffeine.addAtom(new Atom(-1.4276, -2.6960,  0.0008, "C"));
+          caffeine.addAtom(new Atom( 3.1926,  1.2061,  0.0003, "C"));
+          caffeine.addAtom(new Atom(-2.2969,  2.1881,  0.0007, "C"));
+          caffeine.addAtom(new Atom( 3.5163, -1.5787,  0.0008, "H"));
+          caffeine.addAtom(new Atom(-1.0451, -3.1973, -0.8937, "H"));
+          caffeine.addAtom(new Atom(-2.5186, -2.7596,  0.0011, "H"));
+          caffeine.addAtom(new Atom(-1.0447, -3.1963,  0.8957, "H"));
+          caffeine.addAtom(new Atom( 4.1992,  0.7801,  0.0002, "H"));
+          caffeine.addAtom(new Atom( 3.0468,  1.8092, -0.8992, "H"));
+          caffeine.addAtom(new Atom( 3.0466,  1.8083,  0.9004, "H"));
+          caffeine.addAtom(new Atom(-1.8087,  3.1651, -0.0003, "H"));
+          caffeine.addAtom(new Atom(-2.9322,  2.1027,  0.8881, "H"));
+          caffeine.addAtom(new Atom(-2.9346,  2.1021, -0.8849, "H"));
+
+          caffeine.center();
+          caffeine.setScale(0.4);
+          caffeine.addBonds(0.1, 100);
+
+          return caffeine;
+      }
+
+      function getCortisol() {
+          const cortisol = new Molecule();
+
+          cortisol.addAtom(new Atom(   3.1144, -0.2859, -1.9416, "O"));
+          cortisol.addAtom(new Atom(  -0.2290,  2.1443,  1.2399, "O"));
+          cortisol.addAtom(new Atom(   4.3267,  1.6729,  0.0603, "O"));
+          cortisol.addAtom(new Atom(   6.7987,  0.5839, -0.4649, "O"));
+          cortisol.addAtom(new Atom(  -6.4227, -0.0344, -1.3444, "O"));
+          cortisol.addAtom(new Atom(   1.8917,  0.1629,  0.1439, "C"));
+          cortisol.addAtom(new Atom(   0.9976, -1.0770, -0.0738, "C"));
+          cortisol.addAtom(new Atom(  -0.4048, -0.9389,  0.5376, "C"));
+          cortisol.addAtom(new Atom(  -1.1203,  0.2887, -0.1144, "C"));
+          cortisol.addAtom(new Atom(   3.2007, -0.3456, -0.5210, "C"));
+          cortisol.addAtom(new Atom(   1.2023,  1.3572, -0.5469, "C"));
+          cortisol.addAtom(new Atom(  -2.6188,  0.4571,  0.3689, "C"));
+          cortisol.addAtom(new Atom(  -0.2481,  1.5819, -0.0645, "C"));
+          cortisol.addAtom(new Atom(   1.8852, -2.2363,  0.3713, "C"));
+          cortisol.addAtom(new Atom(   3.3025, -1.8232, -0.0778, "C"));
+          cortisol.addAtom(new Atom(  -1.2196, -2.2201,  0.2998, "C"));
+          cortisol.addAtom(new Atom(   2.1566,  0.4723,  1.6434, "C"));
+          cortisol.addAtom(new Atom(  -3.3459, -0.8879,  0.2342, "C"));
+          cortisol.addAtom(new Atom(  -2.6438, -2.0894,  0.8180, "C"));
+          cortisol.addAtom(new Atom(  -3.3005,  1.5233, -0.5375, "C"));
+          cortisol.addAtom(new Atom(  -2.7469,  0.8977,  1.8447, "C"));
+          cortisol.addAtom(new Atom(   4.4119,  0.4683, -0.1739, "C"));
+          cortisol.addAtom(new Atom(  -4.8187,  1.5076, -0.4589, "C"));
+          cortisol.addAtom(new Atom(  -4.5569, -1.0370, -0.3282, "C"));
+          cortisol.addAtom(new Atom(  -5.3417,  0.1333, -0.7839, "C"));
+          cortisol.addAtom(new Atom(   5.7297, -0.2757, -0.1305, "C"));
+          cortisol.addAtom(new Atom(   0.8473, -1.2116, -1.1581, "H"));
+          cortisol.addAtom(new Atom(  -0.3282, -0.7923,  1.6194, "H"));
+          cortisol.addAtom(new Atom(  -1.1826,  0.0413, -1.1878, "H"));
+          cortisol.addAtom(new Atom(   1.1651,  1.1932, -1.6310, "H"));
+          cortisol.addAtom(new Atom(   1.7893,  2.2693, -0.3873, "H"));
+          cortisol.addAtom(new Atom(  -0.6965,  2.3364, -0.7206, "H"));
+          cortisol.addAtom(new Atom(   1.5866, -3.1835, -0.0893, "H"));
+          cortisol.addAtom(new Atom(   1.8513, -2.3707,  1.4585, "H"));
+          cortisol.addAtom(new Atom(   3.9799, -1.9801,  0.7680, "H"));
+          cortisol.addAtom(new Atom(   3.6327, -2.4726, -0.8968, "H"));
+          cortisol.addAtom(new Atom(  -0.7411, -3.0685,  0.8028, "H"));
+          cortisol.addAtom(new Atom(  -1.2414, -2.4588, -0.7717, "H"));
+          cortisol.addAtom(new Atom(   2.5932,  1.4674,  1.7778, "H"));
+          cortisol.addAtom(new Atom(   1.2472,  0.4542,  2.2478, "H"));
+          cortisol.addAtom(new Atom(   2.8417, -0.2458,  2.1066, "H"));
+          cortisol.addAtom(new Atom(  -2.6306, -2.0002,  1.9112, "H"));
+          cortisol.addAtom(new Atom(  -3.1861, -3.0161,  0.5933, "H"));
+          cortisol.addAtom(new Atom(  -3.0152,  1.3502, -1.5848, "H"));
+          cortisol.addAtom(new Atom(  -2.9470,  2.5298, -0.2833, "H"));
+          cortisol.addAtom(new Atom(  -2.0849,  0.3299,  2.5058, "H"));
+          cortisol.addAtom(new Atom(  -2.5197,  1.9601,  1.9758, "H"));
+          cortisol.addAtom(new Atom(  -3.7681,  0.7560,  2.2197, "H"));
+          cortisol.addAtom(new Atom(   3.8725, -0.7647, -2.3175, "H"));
+          cortisol.addAtom(new Atom(  -5.2240,  2.2162, -1.1896, "H"));
+          cortisol.addAtom(new Atom(  -5.1788,  1.7970,  0.5334, "H"));
+          cortisol.addAtom(new Atom(   0.2825,  2.9701,  1.1999, "H"));
+          cortisol.addAtom(new Atom(  -5.0341, -2.0073, -0.4142, "H"));
+          cortisol.addAtom(new Atom(   5.7358, -1.0838, -0.8657, "H"));
+          cortisol.addAtom(new Atom(   5.8942, -0.6856,  0.8696, "H"));
+          cortisol.addAtom(new Atom(   6.8615,  1.2578,  0.2335, "H"));
+
+          cortisol.center();
+          cortisol.setScale(0.4);
+          cortisol.addBonds(0.1, 100);
+
+          return cortisol;
+      }
+
+      function getDna() {
+          const dna = new Molecule();
+
+          dna.addAtom(new Atom( -0.808,  -8.873,  -2.080, "P"));
+          dna.addAtom(new Atom( -0.196, -10.198,  -1.860, "O"));
+          dna.addAtom(new Atom( -2.029,  -8.583,  -1.290, "O"));
+          dna.addAtom(new Atom(  0.270,  -7.725,  -1.830, "O"));
+          dna.addAtom(new Atom(  4.189,  -7.682,  -0.250, "O"));
+          dna.addAtom(new Atom(  2.252,  -5.410,  -0.470, "C"));
+          dna.addAtom(new Atom(  3.108,  -4.880,  -0.052, "H"));
+          dna.addAtom(new Atom(  2.035,  -6.740,   0.240, "C"));
+          dna.addAtom(new Atom(  2.420,  -6.732,   1.260, "H"));
+          dna.addAtom(new Atom(  0.982,  -7.015,   0.289, "H"));
+          dna.addAtom(new Atom(  2.818,  -7.701,  -0.640, "C"));
+          dna.addAtom(new Atom(  2.437,  -8.720,  -0.571, "H"));
+          dna.addAtom(new Atom(  2.608,  -7.128,  -2.040, "C"));
+          dna.addAtom(new Atom(  3.470,  -7.426,  -2.637, "H"));
+          dna.addAtom(new Atom(  1.364,  -7.578,  -2.770, "C"));
+          dna.addAtom(new Atom(  1.104,  -6.836,  -3.525, "H"));
+          dna.addAtom(new Atom(  1.561,  -8.532,  -3.258, "H"));
+          dna.addAtom(new Atom(  2.530,  -5.682,  -1.830, "O"));
+          dna.addAtom(new Atom( -1.645,  -0.802,  -0.140, "N"));
+          dna.addAtom(new Atom( -1.755,   0.217,  -0.042, "H"));
+          dna.addAtom(new Atom( -2.476,  -1.404,  -0.230, "H"));
+          dna.addAtom(new Atom( -0.417,  -1.347,  -0.150, "C"));
+          dna.addAtom(new Atom( -0.191,  -2.733,  -0.280, "C"));
+          dna.addAtom(new Atom( -1.049,  -3.808,  -0.430, "N"));
+          dna.addAtom(new Atom( -0.253,  -4.833,  -0.500, "C"));
+          dna.addAtom(new Atom( -0.608,  -5.858,  -0.612, "H"));
+          dna.addAtom(new Atom(  1.073,  -4.504,  -0.420, "N"));
+          dna.addAtom(new Atom(  1.112,  -3.139,  -0.280, "C"));
+          dna.addAtom(new Atom(  2.210,  -2.370,  -0.160, "N"));
+          dna.addAtom(new Atom(  1.868,  -1.105,  -0.040, "C"));
+          dna.addAtom(new Atom(  2.698,  -0.407,   0.067, "H"));
+          dna.addAtom(new Atom(  0.658,  -0.554,  -0.030, "N"));
+          dna.addAtom(new Atom(  4.562,  -7.653,   1.300, "P"));
+          dna.addAtom(new Atom(  5.836,  -8.366,   1.520, "O"));
+          dna.addAtom(new Atom(  3.403,  -8.136,   2.090, "O"));
+          dna.addAtom(new Atom(  4.759,  -6.091,   1.550, "O"));
+          dna.addAtom(new Atom(  7.904,  -3.753,   3.130, "O"));
+          dna.addAtom(new Atom(  5.002,  -3.053,   2.910, "C"));
+          dna.addAtom(new Atom(  5.383,  -2.121,   3.328, "H"));
+          dna.addAtom(new Atom(  5.608,  -4.257,   3.620, "C"));
+          dna.addAtom(new Atom(  5.915,  -4.024,   4.640, "H"));
+          dna.addAtom(new Atom(  4.918,  -5.099,   3.669, "H"));
+          dna.addAtom(new Atom(  6.806,  -4.574,   2.740, "C"));
+          dna.addAtom(new Atom(  7.097,  -5.622,   2.809, "H"));
+          dna.addAtom(new Atom(  6.300,  -4.234,   1.340, "C"));
+          dna.addAtom(new Atom(  7.172,  -3.968,   0.743, "H"));
+          dna.addAtom(new Atom(  5.558,  -5.329,   0.610, "C"));
+          dna.addAtom(new Atom(  4.911,  -4.882,  -0.145, "H"));
+          dna.addAtom(new Atom(  6.278,  -5.985,   0.122, "H"));
+          dna.addAtom(new Atom(  5.387,  -3.110,   1.550, "O"));
+          dna.addAtom(new Atom( -0.508,  -2.712,   3.110, "N"));
+          dna.addAtom(new Atom( -1.100,  -3.551,   3.036, "H"));
+          dna.addAtom(new Atom( -0.940,  -1.785,   3.223, "H"));
+          dna.addAtom(new Atom(  0.810,  -2.827,   3.060, "C"));
+          dna.addAtom(new Atom(  1.548,  -1.714,   3.160, "N"));
+          dna.addAtom(new Atom(  2.902,  -1.771,   3.110, "C"));
+          dna.addAtom(new Atom(  3.611,  -0.761,   3.200, "O"));
+          dna.addAtom(new Atom(  3.515,  -3.013,   2.960, "N"));
+          dna.addAtom(new Atom(  2.775,  -4.147,   2.860, "C"));
+          dna.addAtom(new Atom(  3.281,  -5.104,   2.737, "H"));
+          dna.addAtom(new Atom(  1.416,  -4.113,   2.910, "C"));
+          dna.addAtom(new Atom(  0.819,  -5.022,   2.839, "H"));
+          dna.addAtom(new Atom(  8.189,  -3.510,   4.680, "P"));
+          dna.addAtom(new Atom(  9.638,  -3.338,   4.900, "O"));
+          dna.addAtom(new Atom(  7.536,  -4.582,   5.470, "O"));
+          dna.addAtom(new Atom(  7.430,  -2.130,   4.930, "O"));
+          dna.addAtom(new Atom(  8.600,   1.610,   6.510, "O"));
+          dna.addAtom(new Atom(  5.841,   0.470,   6.290, "C"));
+          dna.addAtom(new Atom(  5.602,   1.448,   6.708, "H"));
+          dna.addAtom(new Atom(  7.039,  -0.147,   7.000, "C"));
+          dna.addAtom(new Atom(  7.150,   0.221,   8.020, "H"));
+          dna.addAtom(new Atom(  6.975,  -1.234,   7.049, "H"));
+          dna.addAtom(new Atom(  8.195,   0.300,   6.120, "C"));
+          dna.addAtom(new Atom(  9.046,  -0.377,   6.189, "H"));
+          dna.addAtom(new Atom(  7.585,   0.278,   4.720, "C"));
+          dna.addAtom(new Atom(  8.134,   1.006,   4.123, "H"));
+          dna.addAtom(new Atom(  7.629,  -1.044,   3.990, "C"));
+          dna.addAtom(new Atom(  6.843,  -1.063,   3.235, "H"));
+          dna.addAtom(new Atom(  8.597,  -1.152,   3.502, "H"));
+          dna.addAtom(new Atom(  6.186,   0.650,   4.930, "O"));
+          dna.addAtom(new Atom(  0.254,  -1.812,   6.620, "N"));
+          dna.addAtom(new Atom( -0.749,  -1.602,   6.718, "H"));
+          dna.addAtom(new Atom(  0.570,  -2.789,   6.530, "H"));
+          dna.addAtom(new Atom(  1.152,  -0.813,   6.610, "C"));
+          dna.addAtom(new Atom(  2.540,  -1.026,   6.480, "C"));
+          dna.addAtom(new Atom(  3.297,  -2.174,   6.330, "N"));
+          dna.addAtom(new Atom(  4.518,  -1.734,   6.260, "C"));
+          dna.addAtom(new Atom(  5.383,  -2.388,   6.148, "H"));
+          dna.addAtom(new Atom(  4.615,  -0.371,   6.340, "N"));
+          dna.addAtom(new Atom(  3.329,   0.088,   6.480, "C"));
+          dna.addAtom(new Atom(  2.937,   1.369,   6.600, "N"));
+          dna.addAtom(new Atom(  1.628,   1.435,   6.720, "C"));
+          dna.addAtom(new Atom(  1.221,   2.440,   6.827, "H"));
+          dna.addAtom(new Atom(  0.730,   0.455,   6.730, "N"));
+          dna.addAtom(new Atom(  8.688,   1.973,   8.060, "P"));
+          dna.addAtom(new Atom(  9.759,   2.965,   8.280, "O"));
+          dna.addAtom(new Atom(  8.790,   0.723,   8.850, "O"));
+          dna.addAtom(new Atom(  7.263,   2.644,   8.310, "O"));
+          dna.addAtom(new Atom(  6.012,   6.358,   9.890, "O"));
+          dna.addAtom(new Atom(  4.449,   3.814,   9.670, "C"));
+          dna.addAtom(new Atom(  3.681,   4.464,  10.088, "H"));
+          dna.addAtom(new Atom(  5.781,   4.018,  10.380, "C"));
+          dna.addAtom(new Atom(  5.655,   4.382,  11.400, "H"));
+          dna.addAtom(new Atom(  6.369,   3.101,  10.429, "H"));
+          dna.addAtom(new Atom(  6.453,   5.060,   9.500, "C"));
+          dna.addAtom(new Atom(  7.540,   5.013,   9.569, "H"));
+          dna.addAtom(new Atom(  5.973,   4.683,   8.100, "C"));
+          dna.addAtom(new Atom(  5.990,   5.595,   7.503, "H"));
+          dna.addAtom(new Atom(  6.786,   3.639,   7.370, "C"));
+          dna.addAtom(new Atom(  6.160,   3.162,   6.615, "H"));
+          dna.addAtom(new Atom(  7.632,   4.121,   6.882, "H"));
+          dna.addAtom(new Atom(  4.622,   4.162,   8.310, "O"));
+          dna.addAtom(new Atom(  1.271,  -1.317,  10.000, "N"));
+          dna.addAtom(new Atom(  0.336,  -1.736,  10.098, "H"));
+          dna.addAtom(new Atom(  2.100,  -1.921,   9.910, "H"));
+          dna.addAtom(new Atom(  1.410,   0.020,   9.990, "C"));
+          dna.addAtom(new Atom(  2.658,   0.663,   9.860, "C"));
+          dna.addAtom(new Atom(  3.946,   0.179,   9.710, "N"));
+          dna.addAtom(new Atom(  4.675,   1.253,   9.640, "C"));
+          dna.addAtom(new Atom(  5.759,   1.232,   9.528, "H"));
+          dna.addAtom(new Atom(  3.952,   2.412,   9.720, "N"));
+          dna.addAtom(new Atom(  2.642,   2.028,   9.860, "C"));
+          dna.addAtom(new Atom(  1.571,   2.834,   9.980, "N"));
+          dna.addAtom(new Atom(  0.474,   2.118,  10.100, "C"));
+          dna.addAtom(new Atom( -0.447,   2.692,  10.207, "H"));
+          dna.addAtom(new Atom(  0.324,   0.797,  10.110, "N"));
+          dna.addAtom(new Atom(  5.869,   6.703,  11.440, "P"));
+          dna.addAtom(new Atom(  6.153,   8.135,  11.660, "O"));
+          dna.addAtom(new Atom(  6.686,   5.751,  12.230, "O"));
+          dna.addAtom(new Atom(  4.322,   6.408,  11.690, "O"));
+          dna.addAtom(new Atom(  1.126,   8.677,  13.270, "O"));
+          dna.addAtom(new Atom(  1.358,   5.700,  13.050, "C"));
+          dna.addAtom(new Atom(  0.354,   5.775,  13.468, "H"));
+          dna.addAtom(new Atom(  2.315,   6.649,  13.760, "C"));
+          dna.addAtom(new Atom(  1.999,   6.869,  14.780, "H"));
+          dna.addAtom(new Atom(  3.329,   6.252,  13.809, "H"));
+          dna.addAtom(new Atom(  2.247,   7.887,  12.880, "C"));
+          dna.addAtom(new Atom(  3.154,   8.487,  12.949, "H"));
+          dna.addAtom(new Atom(  2.080,   7.300,  11.480, "C"));
+          dna.addAtom(new Atom(  1.557,   8.047,  10.883, "H"));
+          dna.addAtom(new Atom(  3.351,   6.932,  10.750, "C"));
+          dna.addAtom(new Atom(  3.125,   6.180,   9.995, "H"));
+          dna.addAtom(new Atom(  3.752,   7.820,  10.262, "H"));
+          dna.addAtom(new Atom(  1.293,   6.084,  11.690, "O"));
+          dna.addAtom(new Atom( -2.299,   1.943,  13.620, "N"));
+          dna.addAtom(new Atom( -2.894,   2.784,  13.627, "H"));
+          dna.addAtom(new Atom( -2.726,   1.010,  13.713, "H"));
+          dna.addAtom(new Atom(  1.681,  -0.315,  13.390, "O"));
+          dna.addAtom(new Atom(  1.143,   0.792,  13.370, "C"));
+          dna.addAtom(new Atom(  1.735,   2.068,  13.240, "C"));
+          dna.addAtom(new Atom(  3.077,   2.430,  13.100, "N"));
+          dna.addAtom(new Atom(  3.046,   3.735,  13.020, "C"));
+          dna.addAtom(new Atom(  3.943,   4.343,  12.901, "H"));
+          dna.addAtom(new Atom(  1.779,   4.275,  13.100, "N"));
+          dna.addAtom(new Atom(  0.934,   3.196,  13.240, "C"));
+          dna.addAtom(new Atom( -0.418,   3.263,  13.360, "N"));
+          dna.addAtom(new Atom( -0.974,   2.061,  13.490, "C"));
+          dna.addAtom(new Atom( -0.255,   0.884,  13.490, "N"));
+          dna.addAtom(new Atom( -0.783,   0.005,  13.585, "H"));
+          dna.addAtom(new Atom(  0.808,   8.873,  14.820, "P"));
+          dna.addAtom(new Atom(  0.196,  10.198,  15.040, "O"));
+          dna.addAtom(new Atom(  2.029,   8.583,  15.610, "O"));
+          dna.addAtom(new Atom( -0.270,   7.725,  15.070, "O"));
+          dna.addAtom(new Atom( -4.189,   7.682,  16.650, "O"));
+          dna.addAtom(new Atom( -2.252,   5.410,  16.430, "C"));
+          dna.addAtom(new Atom( -3.108,   4.880,  16.848, "H"));
+          dna.addAtom(new Atom( -2.035,   6.740,  17.140, "C"));
+          dna.addAtom(new Atom( -2.420,   6.732,  18.160, "H"));
+          dna.addAtom(new Atom( -0.982,   7.015,  17.189, "H"));
+          dna.addAtom(new Atom( -2.818,   7.701,  16.260, "C"));
+          dna.addAtom(new Atom( -2.437,   8.720,  16.329, "H"));
+          dna.addAtom(new Atom( -2.608,   7.128,  14.860, "C"));
+          dna.addAtom(new Atom( -3.470,   7.426,  14.263, "H"));
+          dna.addAtom(new Atom( -1.364,   7.578,  14.130, "C"));
+          dna.addAtom(new Atom( -1.104,   6.836,  13.375, "H"));
+          dna.addAtom(new Atom( -1.561,   8.532,  13.642, "H"));
+          dna.addAtom(new Atom( -2.530,   5.682,  15.070, "O"));
+          dna.addAtom(new Atom(  1.645,   0.802,  16.760, "N"));
+          dna.addAtom(new Atom(  1.755,  -0.217,  16.858, "H"));
+          dna.addAtom(new Atom(  2.476,   1.404,  16.670, "H"));
+          dna.addAtom(new Atom(  0.417,   1.347,  16.750, "C"));
+          dna.addAtom(new Atom(  0.191,   2.733,  16.620, "C"));
+          dna.addAtom(new Atom(  1.049,   3.808,  16.470, "N"));
+          dna.addAtom(new Atom(  0.253,   4.833,  16.400, "C"));
+          dna.addAtom(new Atom(  0.608,   5.858,  16.288, "H"));
+          dna.addAtom(new Atom( -1.073,   4.504,  16.480, "N"));
+          dna.addAtom(new Atom( -1.112,   3.139,  16.620, "C"));
+          dna.addAtom(new Atom( -2.210,   2.370,  16.740, "N"));
+          dna.addAtom(new Atom( -1.868,   1.105,  16.860, "C"));
+          dna.addAtom(new Atom( -2.698,   0.407,  16.967, "H"));
+          dna.addAtom(new Atom( -0.658,   0.554,  16.870, "N"));
+          dna.addAtom(new Atom( -4.562,   7.653,  18.200, "P"));
+          dna.addAtom(new Atom( -5.836,   8.366,  18.420, "O"));
+          dna.addAtom(new Atom( -3.403,   8.136,  18.990, "O"));
+          dna.addAtom(new Atom( -4.759,   6.091,  18.450, "O"));
+          dna.addAtom(new Atom( -7.904,   3.753,  20.030, "O"));
+          dna.addAtom(new Atom( -5.002,   3.053,  19.810, "C"));
+          dna.addAtom(new Atom( -5.383,   2.121,  20.228, "H"));
+          dna.addAtom(new Atom( -5.608,   4.257,  20.520, "C"));
+          dna.addAtom(new Atom( -5.915,   4.024,  21.540, "H"));
+          dna.addAtom(new Atom( -4.918,   5.099,  20.569, "H"));
+          dna.addAtom(new Atom( -6.806,   4.574,  19.640, "C"));
+          dna.addAtom(new Atom( -7.097,   5.622,  19.709, "H"));
+          dna.addAtom(new Atom( -6.300,   4.234,  18.240, "C"));
+          dna.addAtom(new Atom( -7.172,   3.968,  17.643, "H"));
+          dna.addAtom(new Atom( -5.558,   5.329,  17.510, "C"));
+          dna.addAtom(new Atom( -4.911,   4.882,  16.755, "H"));
+          dna.addAtom(new Atom( -6.278,   5.985,  17.022, "H"));
+          dna.addAtom(new Atom( -5.387,   3.110,  18.450, "O"));
+          dna.addAtom(new Atom(  0.859,   1.616,  20.140, "N"));
+          dna.addAtom(new Atom(  1.548,   0.856,  20.238, "H"));
+          dna.addAtom(new Atom(  1.178,   2.591,  20.050, "H"));
+          dna.addAtom(new Atom( -0.454,   1.335,  20.130, "C"));
+          dna.addAtom(new Atom( -1.452,   2.323,  20.000, "C"));
+          dna.addAtom(new Atom( -1.390,   3.697,  19.850, "N"));
+          dna.addAtom(new Atom( -2.636,   4.059,  19.780, "C"));
+          dna.addAtom(new Atom( -2.951,   5.096,  19.668, "H"));
+          dna.addAtom(new Atom( -3.515,   3.013,  19.860, "N"));
+          dna.addAtom(new Atom( -2.745,   1.886,  20.000, "C"));
+          dna.addAtom(new Atom( -3.181,   0.618,  20.120, "N"));
+          dna.addAtom(new Atom( -2.161,  -0.204,  20.240, "C"));
+          dna.addAtom(new Atom( -2.422,  -1.257,  20.347, "H"));
+          dna.addAtom(new Atom( -0.858,   0.061,  20.250, "N"));
+          dna.addAtom(new Atom( -8.189,   3.510,  21.580, "P"));
+          dna.addAtom(new Atom( -9.638,   3.338,  21.800, "O"));
+          dna.addAtom(new Atom( -7.536,   4.582,  22.370, "O"));
+          dna.addAtom(new Atom( -7.430,   2.130,  21.830, "O"));
+          dna.addAtom(new Atom( -8.600,  -1.610,  23.410, "O"));
+          dna.addAtom(new Atom( -5.841,  -0.470,  23.190, "C"));
+          dna.addAtom(new Atom( -5.602,  -1.448,  23.608, "H"));
+          dna.addAtom(new Atom( -7.039,   0.147,  23.900, "C"));
+          dna.addAtom(new Atom( -7.150,  -0.221,  24.920, "H"));
+          dna.addAtom(new Atom( -6.975,   1.234,  23.949, "H"));
+          dna.addAtom(new Atom( -8.195,  -0.300,  23.020, "C"));
+          dna.addAtom(new Atom( -9.046,   0.377,  23.089, "H"));
+          dna.addAtom(new Atom( -7.585,  -0.278,  21.620, "C"));
+          dna.addAtom(new Atom( -8.134,  -1.006,  21.023, "H"));
+          dna.addAtom(new Atom( -7.629,   1.044,  20.890, "C"));
+          dna.addAtom(new Atom( -6.843,   1.063,  20.135, "H"));
+          dna.addAtom(new Atom( -8.597,   1.152,  20.402, "H"));
+          dna.addAtom(new Atom( -6.186,  -0.650,  21.830, "O"));
+          dna.addAtom(new Atom( -1.184,   2.493,  23.390, "N"));
+          dna.addAtom(new Atom( -1.197,   3.520,  23.316, "H"));
+          dna.addAtom(new Atom( -0.288,   1.996,  23.503, "H"));
+          dna.addAtom(new Atom( -2.317,   1.811,  23.340, "C"));
+          dna.addAtom(new Atom( -2.260,   0.477,  23.440, "N"));
+          dna.addAtom(new Atom( -3.389,  -0.273,  23.390, "C"));
+          dna.addAtom(new Atom( -3.369,  -1.507,  23.480, "O"));
+          dna.addAtom(new Atom( -4.615,   0.371,  23.240, "N"));
+          dna.addAtom(new Atom( -4.683,   1.723,  23.140, "C"));
+          dna.addAtom(new Atom( -5.655,   2.201,  23.017, "H"));
+          dna.addAtom(new Atom( -3.563,   2.495,  23.190, "C"));
+          dna.addAtom(new Atom( -3.614,   3.582,  23.119, "H"));
+          dna.addAtom(new Atom( -8.688,  -1.973,  24.960, "P"));
+          dna.addAtom(new Atom( -9.759,  -2.965,  25.180, "O"));
+          dna.addAtom(new Atom( -8.790,  -0.723,  25.750, "O"));
+          dna.addAtom(new Atom( -7.263,  -2.644,  25.210, "O"));
+          dna.addAtom(new Atom( -6.012,  -6.358,  26.790, "O"));
+          dna.addAtom(new Atom( -4.449,  -3.814,  26.570, "C"));
+          dna.addAtom(new Atom( -3.681,  -4.464,  26.988, "H"));
+          dna.addAtom(new Atom( -5.781,  -4.018,  27.280, "C"));
+          dna.addAtom(new Atom( -5.655,  -4.382,  28.300, "H"));
+          dna.addAtom(new Atom( -6.369,  -3.101,  27.329, "H"));
+          dna.addAtom(new Atom( -6.453,  -5.060,  26.400, "C"));
+          dna.addAtom(new Atom( -7.540,  -5.013,  26.469, "H"));
+          dna.addAtom(new Atom( -5.973,  -4.683,  25.000, "C"));
+          dna.addAtom(new Atom( -5.990,  -5.595,  24.403, "H"));
+          dna.addAtom(new Atom( -6.786,  -3.639,  24.270, "C"));
+          dna.addAtom(new Atom( -6.160,  -3.162,  23.515, "H"));
+          dna.addAtom(new Atom( -7.632,  -4.121,  23.782, "H"));
+          dna.addAtom(new Atom( -4.622,  -4.162,  25.210, "O"));
+          dna.addAtom(new Atom( -2.483,   1.337,  26.770, "O"));
+          dna.addAtom(new Atom( -2.973,   0.203,  26.720, "C"));
+          dna.addAtom(new Atom( -2.176,  -0.914,  26.810, "N"));
+          dna.addAtom(new Atom( -1.165,  -0.753,  26.918, "H"));
+          dna.addAtom(new Atom( -2.593,  -2.230,  26.770, "C"));
+          dna.addAtom(new Atom( -1.809,  -3.159,  26.860, "O"));
+          dna.addAtom(new Atom( -3.952,  -2.412,  26.620, "N"));
+          dna.addAtom(new Atom( -4.823,  -1.356,  26.520, "C"));
+          dna.addAtom(new Atom( -5.889,  -1.548,  26.398, "H"));
+          dna.addAtom(new Atom( -4.379,  -0.084,  26.570, "C"));
+          dna.addAtom(new Atom( -5.286,   1.105,  26.460, "C"));
+          dna.addAtom(new Atom( -4.689,   2.015,  26.420, "H"));
+          dna.addAtom(new Atom( -5.884,   1.023,  25.552, "H"));
+          dna.addAtom(new Atom( -5.946,   1.141,  27.327, "H"));
+          dna.addAtom(new Atom( -5.869,  -6.703,  28.340, "P"));
+          dna.addAtom(new Atom( -6.153,  -8.135,  28.560, "O"));
+          dna.addAtom(new Atom( -6.686,  -5.751,  29.130, "O"));
+          dna.addAtom(new Atom( -4.322,  -6.408,  28.590, "O"));
+          dna.addAtom(new Atom( -1.126,  -8.677,  30.170, "O"));
+          dna.addAtom(new Atom( -1.358,  -5.700,  29.950, "C"));
+          dna.addAtom(new Atom( -0.354,  -5.775,  30.368, "H"));
+          dna.addAtom(new Atom( -2.315,  -6.649,  30.660, "C"));
+          dna.addAtom(new Atom( -1.999,  -6.869,  31.680, "H"));
+          dna.addAtom(new Atom( -3.329,  -6.252,  30.709, "H"));
+          dna.addAtom(new Atom( -2.247,  -7.887,  29.780, "C"));
+          dna.addAtom(new Atom( -3.154,  -8.487,  29.849, "H"));
+          dna.addAtom(new Atom( -2.080,  -7.300,  28.380, "C"));
+          dna.addAtom(new Atom( -1.557,  -8.047,  27.783, "H"));
+          dna.addAtom(new Atom( -3.351,  -6.932,  27.650, "C"));
+          dna.addAtom(new Atom( -3.125,  -6.180,  26.895, "H"));
+          dna.addAtom(new Atom( -3.752,  -7.820,  27.162, "H"));
+          dna.addAtom(new Atom( -1.293,  -6.084,  28.590, "O"));
+          dna.addAtom(new Atom( -1.802,   0.318,  30.280, "N"));
+          dna.addAtom(new Atom( -1.292,   1.208,  30.378, "H"));
+          dna.addAtom(new Atom( -2.828,   0.320,  30.190, "H"));
+          dna.addAtom(new Atom( -1.129,  -0.845,  30.270, "C"));
+          dna.addAtom(new Atom( -1.761,  -2.099,  30.140, "C"));
+          dna.addAtom(new Atom( -3.087,  -2.464,  29.990, "N"));
+          dna.addAtom(new Atom( -3.045,  -3.761,  29.920, "C"));
+          dna.addAtom(new Atom( -3.935,  -4.382,  29.808, "H"));
+          dna.addAtom(new Atom( -1.779,  -4.275,  30.000, "N"));
+          dna.addAtom(new Atom( -0.945,  -3.193,  30.140, "C"));
+          dna.addAtom(new Atom(  0.395,  -3.216,  30.260, "N"));
+          dna.addAtom(new Atom(  0.862,  -1.992,  30.380, "C"));
+          dna.addAtom(new Atom(  1.944,  -1.915,  30.487, "H"));
+          dna.addAtom(new Atom(  0.207,  -0.835,  30.390, "N"));
+          dna.addAtom(new Atom(  4.562,   7.653,  32.500, "P"));
+          dna.addAtom(new Atom(  5.836,   8.366,  32.280, "O"));
+          dna.addAtom(new Atom(  3.403,   8.136,  31.710, "O"));
+          dna.addAtom(new Atom(  4.759,   6.091,  32.250, "O"));
+          dna.addAtom(new Atom(  7.904,   3.753,  30.670, "O"));
+          dna.addAtom(new Atom(  5.002,   3.053,  30.890, "C"));
+          dna.addAtom(new Atom(  5.383,   2.121,  30.472, "H"));
+          dna.addAtom(new Atom(  5.608,   4.257,  30.180, "C"));
+          dna.addAtom(new Atom(  5.915,   4.024,  29.160, "H"));
+          dna.addAtom(new Atom(  4.918,   5.099,  30.131, "H"));
+          dna.addAtom(new Atom(  6.806,   4.574,  31.060, "C"));
+          dna.addAtom(new Atom(  7.097,   5.622,  30.991, "H"));
+          dna.addAtom(new Atom(  6.300,   4.234,  32.460, "C"));
+          dna.addAtom(new Atom(  7.172,   3.968,  33.057, "H"));
+          dna.addAtom(new Atom(  5.558,   5.329,  33.190, "C"));
+          dna.addAtom(new Atom(  4.911,   4.882,  33.945, "H"));
+          dna.addAtom(new Atom(  6.278,   5.985,  33.679, "H"));
+          dna.addAtom(new Atom(  5.387,   3.110,  32.250, "O"));
+          dna.addAtom(new Atom( -0.505,   2.774,  30.690, "O"));
+          dna.addAtom(new Atom(  0.726,   2.891,  30.740, "C"));
+          dna.addAtom(new Atom(  1.542,   1.787,  30.650, "N"));
+          dna.addAtom(new Atom(  1.076,   0.875,  30.542, "H"));
+          dna.addAtom(new Atom(  2.922,   1.777,  30.690, "C"));
+          dna.addAtom(new Atom(  3.563,   0.745,  30.600, "O"));
+          dna.addAtom(new Atom(  3.515,   3.013,  30.840, "N"));
+          dna.addAtom(new Atom(  2.780,   4.168,  30.940, "C"));
+          dna.addAtom(new Atom(  3.292,   5.122,  31.062, "H"));
+          dna.addAtom(new Atom(  1.434,   4.139,  30.890, "C"));
+          dna.addAtom(new Atom(  0.583,   5.369,  31.000, "C"));
+          dna.addAtom(new Atom(  1.221,   6.252,  31.014, "H"));
+          dna.addAtom(new Atom( -0.092,   5.422,  30.146, "H"));
+          dna.addAtom(new Atom(  0.001,   5.327,  31.920, "H"));
+          dna.addAtom(new Atom(  8.189,   3.510,  29.120, "P"));
+          dna.addAtom(new Atom(  9.638,   3.338,  28.900, "O"));
+          dna.addAtom(new Atom(  7.536,   4.582,  28.330, "O"));
+          dna.addAtom(new Atom(  7.430,   2.130,  28.870, "O"));
+          dna.addAtom(new Atom(  8.600,  -1.610,  27.290, "O"));
+          dna.addAtom(new Atom(  5.841,  -0.470,  27.510, "C"));
+          dna.addAtom(new Atom(  5.602,  -1.448,  27.092, "H"));
+          dna.addAtom(new Atom(  7.039,   0.147,  26.800, "C"));
+          dna.addAtom(new Atom(  7.150,  -0.221,  25.780, "H"));
+          dna.addAtom(new Atom(  6.975,   1.234,  26.751, "H"));
+          dna.addAtom(new Atom(  8.195,  -0.300,  27.680, "C"));
+          dna.addAtom(new Atom(  9.046,   0.377,  27.611, "H"));
+          dna.addAtom(new Atom(  7.585,  -0.278,  29.080, "C"));
+          dna.addAtom(new Atom(  8.134,  -1.006,  29.677, "H"));
+          dna.addAtom(new Atom(  7.629,   1.045,  29.810, "C"));
+          dna.addAtom(new Atom(  6.843,   1.063,  30.565, "H"));
+          dna.addAtom(new Atom(  8.597,   1.152,  30.299, "H"));
+          dna.addAtom(new Atom(  6.186,  -0.650,  28.870, "O"));
+          dna.addAtom(new Atom(  0.254,   1.812,  27.180, "N"));
+          dna.addAtom(new Atom( -0.749,   1.602,  27.082, "H"));
+          dna.addAtom(new Atom(  0.570,   2.789,  27.270, "H"));
+          dna.addAtom(new Atom(  1.152,   0.813,  27.190, "C"));
+          dna.addAtom(new Atom(  2.540,   1.026,  27.320, "C"));
+          dna.addAtom(new Atom(  3.297,   2.174,  27.470, "N"));
+          dna.addAtom(new Atom(  4.518,   1.734,  27.540, "C"));
+          dna.addAtom(new Atom(  5.383,   2.388,  27.652, "H"));
+          dna.addAtom(new Atom(  4.615,   0.371,  27.460, "N"));
+          dna.addAtom(new Atom(  3.329,  -0.088,  27.320, "C"));
+          dna.addAtom(new Atom(  2.937,  -1.369,  27.200, "N"));
+          dna.addAtom(new Atom(  1.628,  -1.435,  27.080, "C"));
+          dna.addAtom(new Atom(  1.221,  -2.440,  26.973, "H"));
+          dna.addAtom(new Atom(  0.730,  -0.455,  27.070, "N"));
+          dna.addAtom(new Atom(  8.688,  -1.973,  25.740, "P"));
+          dna.addAtom(new Atom(  9.759,  -2.965,  25.520, "O"));
+          dna.addAtom(new Atom(  8.790,  -0.723,  24.950, "O"));
+          dna.addAtom(new Atom(  7.263,  -2.644,  25.490, "O"));
+          dna.addAtom(new Atom(  6.012,  -6.358,  23.910, "O"));
+          dna.addAtom(new Atom(  4.449,  -3.814,  24.130, "C"));
+          dna.addAtom(new Atom(  3.681,  -4.464,  23.712, "H"));
+          dna.addAtom(new Atom(  5.781,  -4.018,  23.420, "C"));
+          dna.addAtom(new Atom(  5.655,  -4.382,  22.400, "H"));
+          dna.addAtom(new Atom(  6.369,  -3.101,  23.371, "H"));
+          dna.addAtom(new Atom(  6.453,  -5.060,  24.300, "C"));
+          dna.addAtom(new Atom(  7.540,  -5.012,  24.231, "H"));
+          dna.addAtom(new Atom(  5.973,  -4.683,  25.700, "C"));
+          dna.addAtom(new Atom(  5.990,  -5.595,  26.297, "H"));
+          dna.addAtom(new Atom(  6.786,  -3.639,  26.430, "C"));
+          dna.addAtom(new Atom(  6.160,  -3.162,  27.185, "H"));
+          dna.addAtom(new Atom(  7.632,  -4.121,  26.919, "H"));
+          dna.addAtom(new Atom(  4.622,  -4.162,  25.490, "O"));
+          dna.addAtom(new Atom( -0.718,  -2.923,  23.560, "N"));
+          dna.addAtom(new Atom( -0.705,  -3.953,  23.553, "H"));
+          dna.addAtom(new Atom( -1.612,  -2.419,  23.467, "H"));
+          dna.addAtom(new Atom(  1.175,   1.243,  23.790, "O"));
+          dna.addAtom(new Atom(  1.390,   0.031,  23.810, "C"));
+          dna.addAtom(new Atom(  2.619,  -0.653,  23.940, "C"));
+          dna.addAtom(new Atom(  3.917,  -0.157,  24.080, "N"));
+          dna.addAtom(new Atom(  4.660,  -1.231,  24.160, "C"));
+          dna.addAtom(new Atom(  5.742,  -1.196,  24.279, "H"));
+          dna.addAtom(new Atom(  3.952,  -2.412,  24.080, "N"));
+          dna.addAtom(new Atom(  2.635,  -2.037,  23.940, "C"));
+          dna.addAtom(new Atom(  1.580,  -2.885,  23.820, "N"));
+          dna.addAtom(new Atom(  0.423,  -2.240,  23.690, "C"));
+          dna.addAtom(new Atom(  0.313,  -0.865,  23.690, "N"));
+          dna.addAtom(new Atom( -0.631,  -0.464,  23.595, "H"));
+          dna.addAtom(new Atom(  5.869,  -6.703,  22.360, "P"));
+          dna.addAtom(new Atom(  6.153,  -8.135,  22.140, "O"));
+          dna.addAtom(new Atom(  6.686,  -5.751,  21.570, "O"));
+          dna.addAtom(new Atom(  4.322,  -6.408,  22.110, "O"));
+          dna.addAtom(new Atom(  1.126,  -8.677,  20.530, "O"));
+          dna.addAtom(new Atom(  1.358,  -5.700,  20.750, "C"));
+          dna.addAtom(new Atom(  0.354,  -5.775,  20.332, "H"));
+          dna.addAtom(new Atom(  2.315,  -6.649,  20.040, "C"));
+          dna.addAtom(new Atom(  1.999,  -6.869,  19.020, "H"));
+          dna.addAtom(new Atom(  3.329,  -6.252,  19.991, "H"));
+          dna.addAtom(new Atom(  2.247,  -7.887,  20.920, "C"));
+          dna.addAtom(new Atom(  3.154,  -8.487,  20.851, "H"));
+          dna.addAtom(new Atom(  2.080,  -7.300,  22.320, "C"));
+          dna.addAtom(new Atom(  1.557,  -8.047,  22.917, "H"));
+          dna.addAtom(new Atom(  3.351,  -6.932,  23.050, "C"));
+          dna.addAtom(new Atom(  3.125,  -6.180,  23.805, "H"));
+          dna.addAtom(new Atom(  3.752,  -7.820,  23.539, "H"));
+          dna.addAtom(new Atom(  1.293,  -6.084,  22.110, "O"));
+          dna.addAtom(new Atom(  2.795,  -0.377,  20.550, "O"));
+          dna.addAtom(new Atom(  2.525,  -1.583,  20.600, "C"));
+          dna.addAtom(new Atom(  1.223,  -2.019,  20.510, "N"));
+          dna.addAtom(new Atom(  0.500,  -1.293,  20.402, "H"));
+          dna.addAtom(new Atom(  0.787,  -3.328,  20.550, "C"));
+          dna.addAtom(new Atom( -0.393,  -3.619,  20.460, "O"));
+          dna.addAtom(new Atom(  1.779,  -4.274,  20.700, "N"));
+          dna.addAtom(new Atom(  3.105,  -3.932,  20.800, "C"));
+          dna.addAtom(new Atom(  3.854,  -4.714,  20.922, "H"));
+          dna.addAtom(new Atom(  3.493,  -2.642,  20.750, "C"));
+          dna.addAtom(new Atom(  4.926,  -2.213,  20.860, "C"));
+          dna.addAtom(new Atom(  5.569,  -3.093,  20.874, "H"));
+          dna.addAtom(new Atom(  5.185,  -1.588,  20.006, "H"));
+          dna.addAtom(new Atom(  5.066,  -1.647,  21.780, "H"));
+          dna.addAtom(new Atom(  0.808,  -8.873,  18.980, "P"));
+          dna.addAtom(new Atom(  0.196, -10.198,  18.760, "O"));
+          dna.addAtom(new Atom(  2.029,  -8.583,  18.190, "O"));
+          dna.addAtom(new Atom( -0.270,  -7.725,  18.730, "O"));
+          dna.addAtom(new Atom( -4.189,  -7.682,  17.150, "O"));
+          dna.addAtom(new Atom( -2.252,  -5.410,  17.370, "C"));
+          dna.addAtom(new Atom( -3.108,  -4.880,  16.952, "H"));
+          dna.addAtom(new Atom( -2.035,  -6.740,  16.660, "C"));
+          dna.addAtom(new Atom( -2.420,  -6.732,  15.640, "H"));
+          dna.addAtom(new Atom( -0.982,  -7.015,  16.611, "H"));
+          dna.addAtom(new Atom( -2.818,  -7.701,  17.540, "C"));
+          dna.addAtom(new Atom( -2.437,  -8.720,  17.471, "H"));
+          dna.addAtom(new Atom( -2.608,  -7.128,  18.940, "C"));
+          dna.addAtom(new Atom( -3.470,  -7.426,  19.537, "H"));
+          dna.addAtom(new Atom( -1.364,  -7.578,  19.670, "C"));
+          dna.addAtom(new Atom( -1.104,  -6.836,  20.425, "H"));
+          dna.addAtom(new Atom( -1.561,  -8.532,  20.159, "H"));
+          dna.addAtom(new Atom( -2.530,  -5.682,  18.730, "O"));
+          dna.addAtom(new Atom(  2.039,  -1.948,  17.170, "O"));
+          dna.addAtom(new Atom(  1.112,  -2.765,  17.220, "C"));
+          dna.addAtom(new Atom( -0.197,  -2.352,  17.130, "N"));
+          dna.addAtom(new Atom( -0.356,  -1.340,  17.022, "H"));
+          dna.addAtom(new Atom( -1.320,  -3.155,  17.170, "C"));
+          dna.addAtom(new Atom( -2.445,  -2.697,  17.080, "O"));
+          dna.addAtom(new Atom( -1.073,  -4.504,  17.320, "N"));
+          dna.addAtom(new Atom(  0.201,  -5.006,  17.420, "C"));
+          dna.addAtom(new Atom(  0.347,  -6.079,  17.542, "H"));
+          dna.addAtom(new Atom(  1.273,  -4.191,  17.370, "C"));
+          dna.addAtom(new Atom(  2.684,  -4.686,  17.480, "C"));
+          dna.addAtom(new Atom(  2.687,  -5.776,  17.494, "H"));
+          dna.addAtom(new Atom(  3.261,  -4.332,  16.626, "H"));
+          dna.addAtom(new Atom(  3.131,  -4.310,  18.400, "H"));
+          dna.addAtom(new Atom( -4.562,  -7.653,  15.600, "P"));
+          dna.addAtom(new Atom( -5.836,  -8.366,  15.380, "O"));
+          dna.addAtom(new Atom( -3.403,  -8.136,  14.810, "O"));
+          dna.addAtom(new Atom( -4.759,  -6.091,  15.350, "O"));
+          dna.addAtom(new Atom( -7.904,  -3.753,  13.770, "O"));
+          dna.addAtom(new Atom( -5.002,  -3.053,  13.990, "C"));
+          dna.addAtom(new Atom( -5.383,  -2.121,  13.572, "H"));
+          dna.addAtom(new Atom( -5.608,  -4.257,  13.280, "C"));
+          dna.addAtom(new Atom( -5.915,  -4.024,  12.260, "H"));
+          dna.addAtom(new Atom( -4.918,  -5.099,  13.231, "H"));
+          dna.addAtom(new Atom( -6.806,  -4.574,  14.160, "C"));
+          dna.addAtom(new Atom( -7.097,  -5.622,  14.091, "H"));
+          dna.addAtom(new Atom( -6.300,  -4.234,  15.560, "C"));
+          dna.addAtom(new Atom( -7.172,  -3.968,  16.157, "H"));
+          dna.addAtom(new Atom( -5.558,  -5.329,  16.290, "C"));
+          dna.addAtom(new Atom( -4.911,  -4.882,  17.045, "H"));
+          dna.addAtom(new Atom( -6.278,  -5.985,  16.779, "H"));
+          dna.addAtom(new Atom( -5.387,  -3.110,  15.350, "O"));
+          dna.addAtom(new Atom(  0.508,  -2.712,  13.790, "N"));
+          dna.addAtom(new Atom(  1.100,  -3.551,  13.864, "H"));
+          dna.addAtom(new Atom(  0.940,  -1.785,  13.677, "H"));
+          dna.addAtom(new Atom( -0.810,  -2.827,  13.840, "C"));
+          dna.addAtom(new Atom( -1.548,  -1.714,  13.740, "N"));
+          dna.addAtom(new Atom( -2.902,  -1.771,  13.790, "C"));
+          dna.addAtom(new Atom( -3.611,  -0.761,  13.700, "O"));
+          dna.addAtom(new Atom( -3.515,  -3.013,  13.940, "N"));
+          dna.addAtom(new Atom( -2.775,  -4.147,  14.040, "C"));
+          dna.addAtom(new Atom( -3.281,  -5.104,  14.163, "H"));
+          dna.addAtom(new Atom( -1.416,  -4.113,  13.990, "C"));
+          dna.addAtom(new Atom( -0.819,  -5.022,  14.061, "H"));
+          dna.addAtom(new Atom( -8.189,  -3.510,  12.220, "P"));
+          dna.addAtom(new Atom( -9.638,  -3.338,  12.000, "O"));
+          dna.addAtom(new Atom( -7.536,  -4.582,  11.430, "O"));
+          dna.addAtom(new Atom( -7.430,  -2.130,  11.970, "O"));
+          dna.addAtom(new Atom( -8.600,   1.610,  10.390, "O"));
+          dna.addAtom(new Atom( -5.841,   0.470,  10.610, "C"));
+          dna.addAtom(new Atom( -5.602,   1.448,  10.192, "H"));
+          dna.addAtom(new Atom( -7.039,  -0.147,   9.900, "C"));
+          dna.addAtom(new Atom( -7.150,   0.221,   8.880, "H"));
+          dna.addAtom(new Atom( -6.975,  -1.234,   9.851, "H"));
+          dna.addAtom(new Atom( -8.195,   0.300,  10.780, "C"));
+          dna.addAtom(new Atom( -9.046,  -0.377,  10.711, "H"));
+          dna.addAtom(new Atom( -7.585,   0.278,  12.180, "C"));
+          dna.addAtom(new Atom( -8.134,   1.006,  12.777, "H"));
+          dna.addAtom(new Atom( -7.629,  -1.044,  12.910, "C"));
+          dna.addAtom(new Atom( -6.843,  -1.063,  13.665, "H"));
+          dna.addAtom(new Atom( -8.597,  -1.152,  13.399, "H"));
+          dna.addAtom(new Atom( -6.186,   0.650,  11.970, "O"));
+          dna.addAtom(new Atom( -1.223,  -2.541,  10.410, "O"));
+          dna.addAtom(new Atom( -2.286,  -1.912,  10.460, "C"));
+          dna.addAtom(new Atom( -2.298,  -0.539,  10.370, "N"));
+          dna.addAtom(new Atom( -1.385,  -0.076,  10.262, "H"));
+          dna.addAtom(new Atom( -3.408,   0.280,  10.410, "C"));
+          dna.addAtom(new Atom( -3.321,   1.492,  10.320, "O"));
+          dna.addAtom(new Atom( -4.615,  -0.371,  10.560, "N"));
+          dna.addAtom(new Atom( -4.699,  -1.738,  10.660, "C"));
+          dna.addAtom(new Atom( -5.674,  -2.209,  10.782, "H"));
+          dna.addAtom(new Atom( -3.593,  -2.506,  10.610, "C"));
+          dna.addAtom(new Atom( -3.627,  -4.001,  10.720, "C"));
+          dna.addAtom(new Atom( -4.663,  -4.341,  10.734, "H"));
+          dna.addAtom(new Atom( -3.112,  -4.440,   9.866, "H"));
+          dna.addAtom(new Atom( -3.132,  -4.309,  11.640, "H"));
+          dna.addAtom(new Atom( -8.688,   1.973,   8.840, "P"));
+          dna.addAtom(new Atom( -9.759,   2.965,   8.620, "O"));
+          dna.addAtom(new Atom( -8.790,   0.723,   8.050, "O"));
+          dna.addAtom(new Atom( -7.263,   2.644,   8.590, "O"));
+          dna.addAtom(new Atom( -6.012,   6.358,   7.010, "O"));
+          dna.addAtom(new Atom( -4.449,   3.814,   7.230, "C"));
+          dna.addAtom(new Atom( -3.681,   4.464,   6.812, "H"));
+          dna.addAtom(new Atom( -5.781,   4.018,   6.520, "C"));
+          dna.addAtom(new Atom( -5.655,   4.382,   5.500, "H"));
+          dna.addAtom(new Atom( -6.369,   3.101,   6.471, "H"));
+          dna.addAtom(new Atom( -6.453,   5.060,   7.400, "C"));
+          dna.addAtom(new Atom( -7.540,   5.013,   7.331, "H"));
+          dna.addAtom(new Atom( -5.973,   4.683,   8.800, "C"));
+          dna.addAtom(new Atom( -5.990,   5.595,   9.397, "H"));
+          dna.addAtom(new Atom( -6.786,   3.639,   9.530, "C"));
+          dna.addAtom(new Atom( -6.160,   3.163,  10.285, "H"));
+          dna.addAtom(new Atom( -7.632,   4.121,  10.019, "H"));
+          dna.addAtom(new Atom( -4.622,   4.162,   8.590, "O"));
+          dna.addAtom(new Atom( -2.483,  -1.337,   7.030, "O"));
+          dna.addAtom(new Atom( -2.973,  -0.203,   7.080, "C"));
+          dna.addAtom(new Atom( -2.176,   0.914,   6.990, "N"));
+          dna.addAtom(new Atom( -1.165,   0.753,   6.882, "H"));
+          dna.addAtom(new Atom( -2.593,   2.230,   7.030, "C"));
+          dna.addAtom(new Atom( -1.809,   3.159,   6.940, "O"));
+          dna.addAtom(new Atom( -3.952,   2.412,   7.180, "N"));
+          dna.addAtom(new Atom( -4.823,   1.356,   7.280, "C"));
+          dna.addAtom(new Atom( -5.889,   1.548,   7.402, "H"));
+          dna.addAtom(new Atom( -4.379,   0.084,   7.230, "C"));
+          dna.addAtom(new Atom( -5.286,  -1.105,   7.340, "C"));
+          dna.addAtom(new Atom( -6.324,  -0.771,   7.354, "H"));
+          dna.addAtom(new Atom( -5.128,  -1.763,   6.486, "H"));
+          dna.addAtom(new Atom( -5.067,  -1.646,   8.260, "H"));
+          dna.addAtom(new Atom( -5.869,   6.703,   5.460, "P"));
+          dna.addAtom(new Atom( -6.153,   8.135,   5.240, "O"));
+          dna.addAtom(new Atom( -6.686,   5.751,   4.670, "O"));
+          dna.addAtom(new Atom( -4.322,   6.408,   5.210, "O"));
+          dna.addAtom(new Atom( -1.126,   8.677,   3.630, "O"));
+          dna.addAtom(new Atom( -1.358,   5.700,   3.850, "C"));
+          dna.addAtom(new Atom( -0.354,   5.775,   3.432, "H"));
+          dna.addAtom(new Atom( -2.315,   6.649,   3.140, "C"));
+          dna.addAtom(new Atom( -1.999,   6.869,   2.120, "H"));
+          dna.addAtom(new Atom( -3.329,   6.253,   3.091, "H"));
+          dna.addAtom(new Atom( -2.247,   7.887,   4.020, "C"));
+          dna.addAtom(new Atom( -3.154,   8.487,   3.951, "H"));
+          dna.addAtom(new Atom( -2.080,   7.300,   5.420, "C"));
+          dna.addAtom(new Atom( -1.557,   8.047,   6.017, "H"));
+          dna.addAtom(new Atom( -3.351,   6.932,   6.150, "C"));
+          dna.addAtom(new Atom( -3.125,   6.180,   6.905, "H"));
+          dna.addAtom(new Atom( -3.752,   7.820,   6.639, "H"));
+          dna.addAtom(new Atom( -1.293,   6.084,   5.210, "O"));
+          dna.addAtom(new Atom(  2.299,   1.943,   3.280, "N"));
+          dna.addAtom(new Atom(  2.894,   2.784,   3.273, "H"));
+          dna.addAtom(new Atom(  2.726,   1.010,   3.187, "H"));
+          dna.addAtom(new Atom( -1.681,  -0.315,   3.510, "O"));
+          dna.addAtom(new Atom( -1.143,   0.792,   3.530, "C"));
+          dna.addAtom(new Atom( -1.735,   2.068,   3.660, "C"));
+          dna.addAtom(new Atom( -3.077,   2.430,   3.800, "N"));
+          dna.addAtom(new Atom( -3.046,   3.735,   3.880, "C"));
+          dna.addAtom(new Atom( -3.943,   4.343,   3.999, "H"));
+          dna.addAtom(new Atom( -1.779,   4.275,   3.800, "N"));
+          dna.addAtom(new Atom( -0.934,   3.196,   3.660, "C"));
+          dna.addAtom(new Atom(  0.418,   3.263,   3.540, "N"));
+          dna.addAtom(new Atom(  0.974,   2.061,   3.410, "C"));
+          dna.addAtom(new Atom(  0.255,   0.884,   3.410, "N"));
+          dna.addAtom(new Atom(  0.783,   0.005,   3.315, "H"));
+          dna.addAtom(new Atom( -0.808,   8.873,   2.080, "P"));
+          dna.addAtom(new Atom( -0.196,  10.198,   1.860, "O"));
+          dna.addAtom(new Atom( -2.029,   8.583,   1.290, "O"));
+          dna.addAtom(new Atom(  0.270,   7.725,   1.830, "O"));
+          dna.addAtom(new Atom(  4.189,   7.682,   0.250, "O"));
+          dna.addAtom(new Atom(  2.252,   5.410,   0.470, "C"));
+          dna.addAtom(new Atom(  3.108,   4.880,   0.052, "H"));
+          dna.addAtom(new Atom(  2.035,   6.740,  -0.240, "C"));
+          dna.addAtom(new Atom(  2.420,   6.732,  -1.260, "H"));
+          dna.addAtom(new Atom(  0.982,   7.015,  -0.289, "H"));
+          dna.addAtom(new Atom(  2.818,   7.701,   0.640, "C"));
+          dna.addAtom(new Atom(  2.437,   8.720,   0.571, "H"));
+          dna.addAtom(new Atom(  2.608,   7.128,   2.040, "C"));
+          dna.addAtom(new Atom(  3.470,   7.426,   2.637, "H"));
+          dna.addAtom(new Atom(  1.364,   7.578,   2.770, "C"));
+          dna.addAtom(new Atom(  1.104,   6.836,   3.525, "H"));
+          dna.addAtom(new Atom(  1.561,   8.532,   3.259, "H"));
+          dna.addAtom(new Atom(  2.530,   5.682,   1.830, "O"));
+          dna.addAtom(new Atom( -2.039,   1.948,   0.270, "O"));
+          dna.addAtom(new Atom( -1.112,   2.765,   0.320, "C"));
+          dna.addAtom(new Atom(  0.197,   2.352,   0.230, "N"));
+          dna.addAtom(new Atom(  0.356,   1.340,   0.122, "H"));
+          dna.addAtom(new Atom(  1.320,   3.155,   0.270, "C"));
+          dna.addAtom(new Atom(  2.445,   2.697,   0.180, "O"));
+          dna.addAtom(new Atom(  1.073,   4.504,   0.420, "N"));
+          dna.addAtom(new Atom( -0.201,   5.006,   0.520, "C"));
+          dna.addAtom(new Atom( -0.347,   6.079,   0.642, "H"));
+          dna.addAtom(new Atom( -1.273,   4.191,   0.470, "C"));
+          dna.addAtom(new Atom( -2.684,   4.686,   0.580, "C"));
+          dna.addAtom(new Atom( -2.687,   5.776,   0.594, "H"));
+          dna.addAtom(new Atom( -3.261,   4.332,  -0.274, "H"));
+          dna.addAtom(new Atom( -3.131,   4.310,   1.500, "H"));
+
+          dna.center();
+          dna.setScale(0.4);
+          dna.addBonds(0.1, 100);
+          return dna;
+      }
+
+      function getNanotube() {
+            const nanotube = new Molecule();
+            nanotube.addAtom(new Atom(   2.064591,   0.000000,  -24.642816, "C"));
+            nanotube.addAtom(new Atom(   1.575573,   1.334205,  -24.642816, "C"));
+            nanotube.addAtom(new Atom(   1.032295,   1.787988,  -23.410675, "C"));
+            nanotube.addAtom(new Atom(  -0.367669,   2.031589,  -23.410675, "C"));
+            nanotube.addAtom(new Atom(  -1.032295,   1.787988,  -24.642816, "C"));
+            nanotube.addAtom(new Atom(  -1.943242,   0.697384,  -24.642816, "C"));
+            nanotube.addAtom(new Atom(  -2.064591,   0.000000,  -23.410675, "C"));
+            nanotube.addAtom(new Atom(  -1.575573,  -1.334205,  -23.410675, "C"));
+            nanotube.addAtom(new Atom(  -1.032295,  -1.787988,  -24.642816, "C"));
+            nanotube.addAtom(new Atom(   0.367669,  -2.031589,  -24.642816, "C"));
+            nanotube.addAtom(new Atom(   1.032295,  -1.787988,  -23.410675, "C"));
+            nanotube.addAtom(new Atom(   1.943242,  -0.697384,  -23.410675, "C"));
+            nanotube.addAtom(new Atom(   2.064591,   0.000000,  -22.178534, "C"));
+            nanotube.addAtom(new Atom(   1.575573,   1.334205,  -22.178534, "C"));
+            nanotube.addAtom(new Atom(   1.032295,   1.787988,  -20.946394, "C"));
+            nanotube.addAtom(new Atom(  -0.367669,   2.031589,  -20.946394, "C"));
+            nanotube.addAtom(new Atom(  -1.032295,   1.787988,  -22.178534, "C"));
+            nanotube.addAtom(new Atom(  -1.943242,   0.697384,  -22.178534, "C"));
+            nanotube.addAtom(new Atom(  -2.064591,   0.000000,  -20.946394, "C"));
+            nanotube.addAtom(new Atom(  -1.575573,  -1.334205,  -20.946394, "C"));
+            nanotube.addAtom(new Atom(  -1.032295,  -1.787988,  -22.178534, "C"));
+            nanotube.addAtom(new Atom(   0.367669,  -2.031589,  -22.178534, "C"));
+            nanotube.addAtom(new Atom(   1.032295,  -1.787988,  -20.946394, "C"));
+            nanotube.addAtom(new Atom(   1.943242,  -0.697384,  -20.946394, "C"));
+            nanotube.addAtom(new Atom(   2.064591,   0.000000,  -19.714253, "C"));
+            nanotube.addAtom(new Atom(   1.575573,   1.334205,  -19.714253, "C"));
+            nanotube.addAtom(new Atom(   1.032295,   1.787988,  -18.482112, "C"));
+            nanotube.addAtom(new Atom(  -0.367669,   2.031589,  -18.482112, "C"));
+            nanotube.addAtom(new Atom(  -1.032295,   1.787988,  -19.714253, "C"));
+            nanotube.addAtom(new Atom(  -1.943242,   0.697384,  -19.714253, "C"));
+            nanotube.addAtom(new Atom(  -2.064591,   0.000000,  -18.482112, "C"));
+            nanotube.addAtom(new Atom(  -1.575573,  -1.334205,  -18.482112, "C"));
+            nanotube.addAtom(new Atom(  -1.032295,  -1.787988,  -19.714253, "C"));
+            nanotube.addAtom(new Atom(   0.367669,  -2.031589,  -19.714253, "C"));
+            nanotube.addAtom(new Atom(   1.032295,  -1.787988,  -18.482112, "C"));
+            nanotube.addAtom(new Atom(   1.943242,  -0.697384,  -18.482112, "C"));
+            nanotube.addAtom(new Atom(   2.064591,   0.000000,  -17.249971, "C"));
+            nanotube.addAtom(new Atom(   1.575573,   1.334205,  -17.249971, "C"));
+            nanotube.addAtom(new Atom(   1.032295,   1.787988,  -16.017830, "C"));
+            nanotube.addAtom(new Atom(  -0.367669,   2.031589,  -16.017830, "C"));
+            nanotube.addAtom(new Atom(  -1.032295,   1.787988,  -17.249971, "C"));
+            nanotube.addAtom(new Atom(  -1.943242,   0.697384,  -17.249971, "C"));
+            nanotube.addAtom(new Atom(  -2.064591,   0.000000,  -16.017830, "C"));
+            nanotube.addAtom(new Atom(  -1.575573,  -1.334205,  -16.017830, "C"));
+            nanotube.addAtom(new Atom(  -1.032295,  -1.787988,  -17.249971, "C"));
+            nanotube.addAtom(new Atom(   0.367669,  -2.031589,  -17.249971, "C"));
+            nanotube.addAtom(new Atom(   1.032295,  -1.787988,  -16.017830, "C"));
+            nanotube.addAtom(new Atom(   1.943242,  -0.697384,  -16.017830, "C"));
+            nanotube.addAtom(new Atom(   2.064591,   0.000000,  -14.785690, "C"));
+            nanotube.addAtom(new Atom(   1.575573,   1.334205,  -14.785690, "C"));
+            nanotube.addAtom(new Atom(   1.032295,   1.787988,  -13.553549, "C"));
+            nanotube.addAtom(new Atom(  -0.367669,   2.031589,  -13.553549, "C"));
+            nanotube.addAtom(new Atom(  -1.032295,   1.787988,  -14.785690, "C"));
+            nanotube.addAtom(new Atom(  -1.943242,   0.697384,  -14.785690, "C"));
+            nanotube.addAtom(new Atom(  -2.064591,   0.000000,  -13.553549, "C"));
+            nanotube.addAtom(new Atom(  -1.575573,  -1.334205,  -13.553549, "C"));
+            nanotube.addAtom(new Atom(  -1.032295,  -1.787988,  -14.785690, "C"));
+            nanotube.addAtom(new Atom(   0.367669,  -2.031589,  -14.785690, "C"));
+            nanotube.addAtom(new Atom(   1.032295,  -1.787988,  -13.553549, "C"));
+            nanotube.addAtom(new Atom(   1.943242,  -0.697384,  -13.553549, "C"));
+            nanotube.addAtom(new Atom(   2.064591,   0.000000,  -12.321408, "C"));
+            nanotube.addAtom(new Atom(   1.575573,   1.334205,  -12.321408, "C"));
+            nanotube.addAtom(new Atom(   1.032295,   1.787988,  -11.089267, "C"));
+            nanotube.addAtom(new Atom(  -0.367669,   2.031589,  -11.089267, "C"));
+            nanotube.addAtom(new Atom(  -1.032295,   1.787988,  -12.321408, "C"));
+            nanotube.addAtom(new Atom(  -1.943242,   0.697384,  -12.321408, "C"));
+            nanotube.addAtom(new Atom(  -2.064591,   0.000000,  -11.089267, "C"));
+            nanotube.addAtom(new Atom(  -1.575573,  -1.334205,  -11.089267, "C"));
+            nanotube.addAtom(new Atom(  -1.032295,  -1.787988,  -12.321408, "C"));
+            nanotube.addAtom(new Atom(   0.367669,  -2.031589,  -12.321408, "C"));
+            nanotube.addAtom(new Atom(   1.032295,  -1.787988,  -11.089267, "C"));
+            nanotube.addAtom(new Atom(   1.943242,  -0.697384,  -11.089267, "C"));
+            nanotube.addAtom(new Atom(   2.064591,   0.000000,   -9.857126, "C"));
+            nanotube.addAtom(new Atom(   1.575573,   1.334205,   -9.857126, "C"));
+            nanotube.addAtom(new Atom(   1.032295,   1.787988,   -8.624986, "C"));
+            nanotube.addAtom(new Atom(  -0.367669,   2.031589,   -8.624986, "C"));
+            nanotube.addAtom(new Atom(  -1.032295,   1.787988,   -9.857126, "C"));
+            nanotube.addAtom(new Atom(  -1.943242,   0.697384,   -9.857126, "C"));
+            nanotube.addAtom(new Atom(  -2.064591,   0.000000,   -8.624986, "C"));
+            nanotube.addAtom(new Atom(  -1.575573,  -1.334205,   -8.624986, "C"));
+            nanotube.addAtom(new Atom(  -1.032295,  -1.787988,   -9.857126, "C"));
+            nanotube.addAtom(new Atom(   0.367669,  -2.031589,   -9.857126, "C"));
+            nanotube.addAtom(new Atom(   1.032295,  -1.787988,   -8.624986, "C"));
+            nanotube.addAtom(new Atom(   1.943242,  -0.697384,   -8.624986, "C"));
+            nanotube.addAtom(new Atom(   2.064591,   0.000000,   -7.392845, "C"));
+            nanotube.addAtom(new Atom(   1.575573,   1.334205,   -7.392845, "C"));
+            nanotube.addAtom(new Atom(   1.032295,   1.787988,   -6.160704, "C"));
+            nanotube.addAtom(new Atom(  -0.367669,   2.031589,   -6.160704, "C"));
+            nanotube.addAtom(new Atom(  -1.032295,   1.787988,   -7.392845, "C"));
+            nanotube.addAtom(new Atom(  -1.943242,   0.697384,   -7.392845, "C"));
+            nanotube.addAtom(new Atom(  -2.064591,   0.000000,   -6.160704, "C"));
+            nanotube.addAtom(new Atom(  -1.575573,  -1.334205,   -6.160704, "C"));
+            nanotube.addAtom(new Atom(  -1.032295,  -1.787988,   -7.392845, "C"));
+            nanotube.addAtom(new Atom(   0.367669,  -2.031589,   -7.392845, "C"));
+            nanotube.addAtom(new Atom(   1.032295,  -1.787988,   -6.160704, "C"));
+            nanotube.addAtom(new Atom(   1.943242,  -0.697384,   -6.160704, "C"));
+            nanotube.addAtom(new Atom(   2.064591,   0.000000,   -4.928563, "C"));
+            nanotube.addAtom(new Atom(   1.575573,   1.334205,   -4.928563, "C"));
+            nanotube.addAtom(new Atom(   1.032295,   1.787988,   -3.696422, "C"));
+            nanotube.addAtom(new Atom(  -0.367669,   2.031589,   -3.696422, "C"));
+            nanotube.addAtom(new Atom(  -1.032295,   1.787988,   -4.928563, "C"));
+            nanotube.addAtom(new Atom(  -1.943242,   0.697384,   -4.928563, "C"));
+            nanotube.addAtom(new Atom(  -2.064591,   0.000000,   -3.696422, "C"));
+            nanotube.addAtom(new Atom(  -1.575573,  -1.334205,   -3.696422, "C"));
+            nanotube.addAtom(new Atom(  -1.032295,  -1.787988,   -4.928563, "C"));
+            nanotube.addAtom(new Atom(   0.367669,  -2.031589,   -4.928563, "C"));
+            nanotube.addAtom(new Atom(   1.032295,  -1.787988,   -3.696422, "C"));
+            nanotube.addAtom(new Atom(   1.943242,  -0.697384,   -3.696422, "C"));
+            nanotube.addAtom(new Atom(   2.064591,   0.000000,   -2.464282, "C"));
+            nanotube.addAtom(new Atom(   1.575573,   1.334205,   -2.464282, "C"));
+            nanotube.addAtom(new Atom(   1.032295,   1.787988,   -1.232141, "C"));
+            nanotube.addAtom(new Atom(  -0.367669,   2.031589,   -1.232141, "C"));
+            nanotube.addAtom(new Atom(  -1.032295,   1.787988,   -2.464282, "C"));
+            nanotube.addAtom(new Atom(  -1.943242,   0.697384,   -2.464282, "C"));
+            nanotube.addAtom(new Atom(  -2.064591,   0.000000,   -1.232141, "C"));
+            nanotube.addAtom(new Atom(  -1.575573,  -1.334205,   -1.232141, "C"));
+            nanotube.addAtom(new Atom(  -1.032295,  -1.787988,   -2.464282, "C"));
+            nanotube.addAtom(new Atom(   0.367669,  -2.031589,   -2.464282, "C"));
+            nanotube.addAtom(new Atom(   1.032295,  -1.787988,   -1.232141, "C"));
+            nanotube.addAtom(new Atom(   1.943242,  -0.697384,   -1.232141, "C"));
+            nanotube.addAtom(new Atom(   2.064591,   0.000000,    0.000000, "C"));
+            nanotube.addAtom(new Atom(   1.575573,   1.334205,    0.000000, "C"));
+            nanotube.addAtom(new Atom(   1.032295,   1.787988,    1.232141, "C"));
+            nanotube.addAtom(new Atom(  -0.367669,   2.031589,    1.232141, "C"));
+            nanotube.addAtom(new Atom(  -1.032295,   1.787988,    0.000000, "C"));
+            nanotube.addAtom(new Atom(  -1.943242,   0.697384,    0.000000, "C"));
+            nanotube.addAtom(new Atom(  -2.064591,   0.000000,    1.232141, "C"));
+            nanotube.addAtom(new Atom(  -1.575573,  -1.334205,    1.232141, "C"));
+            nanotube.addAtom(new Atom(  -1.032295,  -1.787988,    0.000000, "C"));
+            nanotube.addAtom(new Atom(   0.367669,  -2.031589,    0.000000, "C"));
+            nanotube.addAtom(new Atom(   1.032295,  -1.787988,    1.232141, "C"));
+            nanotube.addAtom(new Atom(   1.943242,  -0.697384,    1.232141, "C"));
+            nanotube.addAtom(new Atom(   2.064591,   0.000000,    2.464282, "C"));
+            nanotube.addAtom(new Atom(   1.575573,   1.334205,    2.464282, "C"));
+            nanotube.addAtom(new Atom(   1.032295,   1.787988,    3.696422, "C"));
+            nanotube.addAtom(new Atom(  -0.367669,   2.031589,    3.696422, "C"));
+            nanotube.addAtom(new Atom(  -1.032295,   1.787988,    2.464282, "C"));
+            nanotube.addAtom(new Atom(  -1.943242,   0.697384,    2.464282, "C"));
+            nanotube.addAtom(new Atom(  -2.064591,   0.000000,    3.696422, "C"));
+            nanotube.addAtom(new Atom(  -1.575573,  -1.334205,    3.696422, "C"));
+            nanotube.addAtom(new Atom(  -1.032295,  -1.787988,    2.464282, "C"));
+            nanotube.addAtom(new Atom(   0.367669,  -2.031589,    2.464282, "C"));
+            nanotube.addAtom(new Atom(   1.032295,  -1.787988,    3.696422, "C"));
+            nanotube.addAtom(new Atom(   1.943242,  -0.697384,    3.696422, "C"));
+            nanotube.addAtom(new Atom(   2.064591,   0.000000,    4.928563, "C"));
+            nanotube.addAtom(new Atom(   1.575573,   1.334205,    4.928563, "C"));
+            nanotube.addAtom(new Atom(   1.032295,   1.787988,    6.160704, "C"));
+            nanotube.addAtom(new Atom(  -0.367669,   2.031589,    6.160704, "C"));
+            nanotube.addAtom(new Atom(  -1.032295,   1.787988,    4.928563, "C"));
+            nanotube.addAtom(new Atom(  -1.943242,   0.697384,    4.928563, "C"));
+            nanotube.addAtom(new Atom(  -2.064591,   0.000000,    6.160704, "C"));
+            nanotube.addAtom(new Atom(  -1.575573,  -1.334205,    6.160704, "C"));
+            nanotube.addAtom(new Atom(  -1.032295,  -1.787988,    4.928563, "C"));
+            nanotube.addAtom(new Atom(   0.367669,  -2.031589,    4.928563, "C"));
+            nanotube.addAtom(new Atom(   1.032295,  -1.787988,    6.160704, "C"));
+            nanotube.addAtom(new Atom(   1.943242,  -0.697384,    6.160704, "C"));
+            nanotube.addAtom(new Atom(   2.064591,   0.000000,    7.392845, "C"));
+            nanotube.addAtom(new Atom(   1.575573,   1.334205,    7.392845, "C"));
+            nanotube.addAtom(new Atom(   1.032295,   1.787988,    8.624986, "C"));
+            nanotube.addAtom(new Atom(  -0.367669,   2.031589,    8.624986, "C"));
+            nanotube.addAtom(new Atom(  -1.032295,   1.787988,    7.392845, "C"));
+            nanotube.addAtom(new Atom(  -1.943242,   0.697384,    7.392845, "C"));
+            nanotube.addAtom(new Atom(  -2.064591,   0.000000,    8.624986, "C"));
+            nanotube.addAtom(new Atom(  -1.575573,  -1.334205,    8.624986, "C"));
+            nanotube.addAtom(new Atom(  -1.032295,  -1.787988,    7.392845, "C"));
+            nanotube.addAtom(new Atom(   0.367669,  -2.031589,    7.392845, "C"));
+            nanotube.addAtom(new Atom(   1.032295,  -1.787988,    8.624986, "C"));
+            nanotube.addAtom(new Atom(   1.943242,  -0.697384,    8.624986, "C"));
+            nanotube.addAtom(new Atom(   2.064591,   0.000000,    9.857126, "C"));
+            nanotube.addAtom(new Atom(   1.575573,   1.334205,    9.857126, "C"));
+            nanotube.addAtom(new Atom(   1.032295,   1.787988,   11.089267, "C"));
+            nanotube.addAtom(new Atom(  -0.367669,   2.031589,   11.089267, "C"));
+            nanotube.addAtom(new Atom(  -1.032295,   1.787988,    9.857126, "C"));
+            nanotube.addAtom(new Atom(  -1.943242,   0.697384,    9.857126, "C"));
+            nanotube.addAtom(new Atom(  -2.064591,   0.000000,   11.089267, "C"));
+            nanotube.addAtom(new Atom(  -1.575573,  -1.334205,   11.089267, "C"));
+            nanotube.addAtom(new Atom(  -1.032295,  -1.787988,    9.857126, "C"));
+            nanotube.addAtom(new Atom(   0.367669,  -2.031589,    9.857126, "C"));
+            nanotube.addAtom(new Atom(   1.032295,  -1.787988,   11.089267, "C"));
+            nanotube.addAtom(new Atom(   1.943242,  -0.697384,   11.089267, "C"));
+            nanotube.addAtom(new Atom(   2.064591,   0.000000,   12.321408, "C"));
+            nanotube.addAtom(new Atom(   1.575573,   1.334205,   12.321408, "C"));
+            nanotube.addAtom(new Atom(   1.032295,   1.787988,   13.553549, "C"));
+            nanotube.addAtom(new Atom(  -0.367669,   2.031589,   13.553549, "C"));
+            nanotube.addAtom(new Atom(  -1.032295,   1.787988,   12.321408, "C"));
+            nanotube.addAtom(new Atom(  -1.943242,   0.697384,   12.321408, "C"));
+            nanotube.addAtom(new Atom(  -2.064591,   0.000000,   13.553549, "C"));
+            nanotube.addAtom(new Atom(  -1.575573,  -1.334205,   13.553549, "C"));
+            nanotube.addAtom(new Atom(  -1.032295,  -1.787988,   12.321408, "C"));
+            nanotube.addAtom(new Atom(   0.367669,  -2.031589,   12.321408, "C"));
+            nanotube.addAtom(new Atom(   1.032295,  -1.787988,   13.553549, "C"));
+            nanotube.addAtom(new Atom(   1.943242,  -0.697384,   13.553549, "C"));
+            nanotube.addAtom(new Atom(   2.064591,   0.000000,   14.785690, "C"));
+            nanotube.addAtom(new Atom(   1.575573,   1.334205,   14.785690, "C"));
+            nanotube.addAtom(new Atom(   1.032295,   1.787988,   16.017830, "C"));
+            nanotube.addAtom(new Atom(  -0.367669,   2.031589,   16.017830, "C"));
+            nanotube.addAtom(new Atom(  -1.032295,   1.787988,   14.785690, "C"));
+            nanotube.addAtom(new Atom(  -1.943242,   0.697384,   14.785690, "C"));
+            nanotube.addAtom(new Atom(  -2.064591,   0.000000,   16.017830, "C"));
+            nanotube.addAtom(new Atom(  -1.575573,  -1.334205,   16.017830, "C"));
+            nanotube.addAtom(new Atom(  -1.032295,  -1.787988,   14.785690, "C"));
+            nanotube.addAtom(new Atom(   0.367669,  -2.031589,   14.785690, "C"));
+            nanotube.addAtom(new Atom(   1.032295,  -1.787988,   16.017830, "C"));
+            nanotube.addAtom(new Atom(   1.943242,  -0.697384,   16.017830, "C"));
+            nanotube.addAtom(new Atom(   2.064591,   0.000000,   17.249971, "C"));
+            nanotube.addAtom(new Atom(   1.575573,   1.334205,   17.249971, "C"));
+            nanotube.addAtom(new Atom(   1.032295,   1.787988,   18.482112, "C"));
+            nanotube.addAtom(new Atom(  -0.367669,   2.031589,   18.482112, "C"));
+            nanotube.addAtom(new Atom(  -1.032295,   1.787988,   17.249971, "C"));
+            nanotube.addAtom(new Atom(  -1.943242,   0.697384,   17.249971, "C"));
+            nanotube.addAtom(new Atom(  -2.064591,   0.000000,   18.482112, "C"));
+            nanotube.addAtom(new Atom(  -1.575573,  -1.334205,   18.482112, "C"));
+            nanotube.addAtom(new Atom(  -1.032295,  -1.787988,   17.249971, "C"));
+            nanotube.addAtom(new Atom(   0.367669,  -2.031589,   17.249971, "C"));
+            nanotube.addAtom(new Atom(   1.032295,  -1.787988,   18.482112, "C"));
+            nanotube.addAtom(new Atom(   1.943242,  -0.697384,   18.482112, "C"));
+            nanotube.addAtom(new Atom(   2.064591,   0.000000,   19.714253, "C"));
+            nanotube.addAtom(new Atom(   1.575573,   1.334205,   19.714253, "C"));
+            nanotube.addAtom(new Atom(   1.032295,   1.787988,   20.946394, "C"));
+            nanotube.addAtom(new Atom(  -0.367669,   2.031589,   20.946394, "C"));
+            nanotube.addAtom(new Atom(  -1.032295,   1.787988,   19.714253, "C"));
+            nanotube.addAtom(new Atom(  -1.943242,   0.697384,   19.714253, "C"));
+            nanotube.addAtom(new Atom(  -2.064591,   0.000000,   20.946394, "C"));
+            nanotube.addAtom(new Atom(  -1.575573,  -1.334205,   20.946394, "C"));
+            nanotube.addAtom(new Atom(  -1.032295,  -1.787988,   19.714253, "C"));
+            nanotube.addAtom(new Atom(   0.367669,  -2.031589,   19.714253, "C"));
+            nanotube.addAtom(new Atom(   1.032295,  -1.787988,   20.946394, "C"));
+            nanotube.addAtom(new Atom(   1.943242,  -0.697384,   20.946394, "C"));
+            nanotube.addAtom(new Atom(   2.064591,   0.000000,   22.178534, "C"));
+            nanotube.addAtom(new Atom(   1.575573,   1.334205,   22.178534, "C"));
+            nanotube.addAtom(new Atom(   1.032295,   1.787988,   23.410675, "C"));
+            nanotube.addAtom(new Atom(  -0.367669,   2.031589,   23.410675, "C"));
+            nanotube.addAtom(new Atom(  -1.032295,   1.787988,   22.178534, "C"));
+            nanotube.addAtom(new Atom(  -1.943242,   0.697384,   22.178534, "C"));
+            nanotube.addAtom(new Atom(  -2.064591,   0.000000,   23.410675, "C"));
+            nanotube.addAtom(new Atom(  -1.575573,  -1.334205,   23.410675, "C"));
+            nanotube.addAtom(new Atom(  -1.032295,  -1.787988,   22.178534, "C"));
+            nanotube.addAtom(new Atom(   0.367669,  -2.031589,   22.178534, "C"));
+            nanotube.addAtom(new Atom(   1.032295,  -1.787988,   23.410675, "C"));
+            nanotube.addAtom(new Atom(   1.943242,  -0.697384,   23.410675, "C"));
+
+            nanotube.center();
+            nanotube.setScale(0.4);
+            nanotube.addBonds(0.1, 100);
+            return nanotube;
+      }
+
+      function setFps(fps) {
+          document.getElementById("fps").innerText = fps;
+      }
+
+      function isMobileDevice() {
+          const smallDevice = window.matchMedia("only screen and (max-width:760px)").matches;
+          const mobilePlatform = /Android|webOS|iPhone|iPad|iPod/i.test(navigator.platform);
+
+          return (smallDevice || mobilePlatform);
+      }
+
+      function displayError(message) {
+          const canvas = document.getElementById('myCanvas');
+          const context = canvas.getContext('2d');
+          context.clearRect(0, 0, canvas.width, canvas.height);
+          context.font = '24px sans-serif';
+          context.fillStyle = 'white';
+          context.textAlign = 'center';
+          context.fillText(message, 400, 200);
+      }
+
+
+      // VS for camera point of view
+      const cameraVs = `#version 300 es
+
+        // Camera vertex shader
+
+        // Per vertex attributes
+        in vec3 aVertexPosition;
+        in vec3 aVertexNormal;
+        in vec2 aTexCoord;
+
+        // Per-instance attributes
+        in mat4 aModelMatrix;
+        in mat3 aNormalMatrix;
+        in vec4 aColor;
+        in vec2 aTexOffset;
+
+        // Uniform attributes
+        uniform mat4 uProjectionMatrix;
+        uniform mat4 uViewMatrix;
+        uniform mat4 uLightProjectionViewMatrix;
+
+        out vec3 n,l,v, ps;
+        out vec4 color;
+        out vec2 vTexCoord;
+        out vec2 vTexOffset;
+        out vec4 lightPosition;
+
+        void main() {
+            vec4 worldPos = aModelMatrix * vec4(aVertexPosition, 1.0);
+            vec4 p = uViewMatrix * worldPos;
+
+            // Output vectors will be interpolated across fragments and passed in to fragment shader
+            n = normalize(aNormalMatrix * aVertexNormal);
+            l = normalize(vec3(2.0, 2.0, 2.0));
+            v = normalize(-p.xyz);
+            ps = normalize(aNormalMatrix * cross(aVertexNormal, vec3(0.0, 0.0, 1.0)));
+
+            color = aColor;
+            vTexCoord = aTexCoord;
+
+            vTexOffset = aTexOffset;
+
+            gl_Position =  uProjectionMatrix * uViewMatrix * worldPos;
+            lightPosition = uLightProjectionViewMatrix * worldPos;
+        }
+      `;
+
+      // FS for camera point of view
+      const cameraFs = `#version 300 es
+
+          // Camera fragment shader
+
+          precision mediump float;
+
+          in vec3 n,l,v, ps;
+          in vec4 color;
+          in vec2 vTexCoord;
+          in vec4 lightPosition;
+          in vec2 vTexOffset;
+
+          uniform sampler2D uSymbolGrid;
+          uniform sampler2D uSamplerSphereMap;
+          uniform sampler2D uSamplerBumpMap;
+          uniform sampler2D uLightDepthTexture;
+
+          out vec4 outColor;
+
+          void main() {
+              // Re-normalize the vectors that were interpolated across fragments
+              vec3 nn = normalize(n);
+              vec3 ln = normalize(l);
+              vec3 vn = normalize(v);
+              vec3 nps = normalize(ps);
+
+              // Obtain a surface normal perturbed by bump map
+              vec2 sForwardCoord = vec2(vTexCoord.s + 0.00195, vTexCoord.t);
+              vec2 tForwardCoord = vec2(vTexCoord.s, vTexCoord.t + 0.00195);
+              vec3 dbds = 2.0 * nps * (-1.0) * (texture(uSamplerBumpMap, sForwardCoord).r - texture(uSamplerBumpMap, vTexCoord).r);
+              vec3 dbdt = 2.0 * cross(n, nps) * (-1.0) * (texture(uSamplerBumpMap, tForwardCoord).r - texture(uSamplerBumpMap, vTexCoord).r);
+              vec3 normal = normalize(nn + dbds + dbdt);
+
+              // Retrieve texture map color (chemical symbol)
+              float repeatX = 1.0 - ((vTexCoord.x * 2.0 < 1.0) ? vTexCoord.x * 2.0 : vTexCoord.x * 2.0 - 1.0);
+              float shrunkCoordX = repeatX * 2.5;
+              float shrunkCoordY = (vTexCoord.y - 0.3) * 2.5;
+              float symbolGridX = shrunkCoordX * 0.25 + vTexOffset.x;
+              float symbolGridY = shrunkCoordY * 0.25 + vTexOffset.y;
+              vec3 texColor = (shrunkCoordX > 0.01 && shrunkCoordX < 0.99 && shrunkCoordY > 0.01 && shrunkCoordY < 0.99)
+                      ? vec3(texture(uSymbolGrid, vec2(symbolGridX, symbolGridY)))
+                      : vec3(1.0, 1.0, 1.0);
+
+              // Obtain color of reflection from sphere map
+              vec3 sphereColor = vec3(texture(uSamplerSphereMap, vec2( 1.0 - (normal.x + 1.0) / 2.0, 1.0 - (normal.y + 1.0) / 2.0)));
+
+              // Create a blended color incorporating base color, reflected color, and chemical symbol color
+              vec3 blendedColor = vec3(
+                  mix(sphereColor.r, color.r, 0.8) * texColor.r,
+                  mix(sphereColor.g, color.g, 0.8) * texColor.g,
+                  mix(sphereColor.b, color.b, 0.8) * texColor.b);
+
+              // Ambient light coefficients
+              float kar = 0.3;
+              float kag = 0.3;
+              float kab = 0.3;
+
+              // Diffuse light coefficients
+              float kdr = 0.4;
+              float kdg = 0.4;
+              float kdb = 0.4;
+
+              // Specular light coefficients
+              float ksr = 0.3;
+              float ksg = 0.3;
+              float ksb = 0.3;
+
+              // Calculate diffuse light
+              float diffuse = clamp(dot(normal, ln), 0.0, 1.0);
+
+              // Calculate specular light
+              vec3 r = 2.0 * dot(normal, ln) * normal - ln;
+              float vdotr = clamp(dot(vn, r), 0.0, 1.0);
+              float specular = clamp(pow(vdotr, 10.0), 0.0, 1.0);
+
+              // No shadow color - includes ambient, diffuse, and specular light
+              float colorR = kar * blendedColor.r + kdr * blendedColor.r * diffuse + ksr * specular;
+              float colorG = kag * blendedColor.g + kdg * blendedColor.g * diffuse + ksg * specular;
+              float colorB = kab * blendedColor.b + kdb * blendedColor.b * diffuse + ksb * specular;
+              vec4 noShadowColor = vec4(colorR, colorG, colorB, 1.0);
+
+              // Shadow color - ambient only
+              float shadowR = kar * blendedColor.r;
+              float shadowG = kag * blendedColor.g;
+              float shadowB = kab * blendedColor.b;
+              vec4 shadowColor = vec4(shadowR, shadowG, shadowB, 1.0);
+
+              // Homogeneous divide only done automatically for gl_Position, divide light coordinate here
+              vec3 adjustedLightPosition = lightPosition.xyz / lightPosition.w;
+              float lightDepth = adjustedLightPosition.z - 0.0005; // bias
+
+              // Check if fragment is in light frustum
+              bool inLight = adjustedLightPosition.x >= -1.0 &&
+                             adjustedLightPosition.x <=  1.0 &&
+                             adjustedLightPosition.y >= -1.0 &&
+                             adjustedLightPosition.y <=  1.0;
+
+              // Shadow - check if fragment in shadow and color accordingly
+              vec2 texCoords = vec2((adjustedLightPosition.x / 2.0 + 0.5), (adjustedLightPosition.y / 2.0 + 0.5));
+              float depthBuffer = pow(texture(uLightDepthTexture, texCoords).r, 2.0);
+              float shadowAmount = ((inLight) && (depthBuffer <= lightDepth)) ? 1.0 : 0.0;
+              outColor = mix(noShadowColor, shadowColor, shadowAmount);
+            }
+        `;
+
+      // VS for light point of view
+      const lightVs = `#version 300 es
+
+        // Light vertex shader
+
+        // Per vertex attributes
+        in vec3 aVertexPosition;
+
+        // Per-instance attributes
+        in mat4 aModelMatrix;
+        in vec4 aColor;
+
+        // Uniform attributes
+        uniform mat4 uProjectionMatrix;
+        uniform mat4 uViewMatrix;
+
+        out vec4 color;
+
+        void main() {
+            color = aColor;
+            gl_Position =  uProjectionMatrix * uViewMatrix * aModelMatrix * vec4(aVertexPosition, 1.0);
+        }
+      `;
+
+      // FS for light point of view
+      const lightFs = `#version 300 es
+
+          // Light fragment shader
+
+          precision mediump float;
+
+          in vec4 color;
+
+          out vec4 outColor;
+
+          void main() {
+              outColor = color;
+            }
+        `;
+
 
     </script>
+    <div id="fps" class="text">FPS: </div>
+</div>
 </body>
 </html>
