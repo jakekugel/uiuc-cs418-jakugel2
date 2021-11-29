@@ -59,6 +59,14 @@ This page was developed using third-party code and other resources.  A
 description of all third-party code and assets is listed here.  The above
 copyright and license does not apply to these assets.
 
+**Boilerplate project cs418-fa21-project** - this repository began as a fork of
+    an example project provided by Prof. Hart (https://github.com/jch-uiuc/cs418-fa21-project).
+    Although I am not aware of any fragments of the original boilerplate
+    index.html that remain in the current code, the sphere map
+    'stadium sphere.jpg' comes from this boilerplate project.  Also, the block
+    'I' logo in bumpmap.png was a modified version of the block 'I' in
+    'illinois512.png' in the boilerplate project.
+
 **gl-matrix-min.js** - this open source linear algebra library was developed
     by a third party.  See the script for authors and copyright.
 
@@ -71,9 +79,6 @@ copyright and license does not apply to these assets.
     WebGL2 usage errors that would otherwise be difficult to catch.  This is
     copyright Gregg Tavares, and the license can be found here:
     https://github.com/greggman/webgl-lint/blob/master/LICENSE.md.
-
-**stadium sphere.jpg** - this sphere map image was provided by Prof. Hart as
-    part of the boilerplate code example provided to begin the project.
 
 **uiuc-compsci-2.jpg** - this image is a modified version of the image used for
     the Illinois CS Twitter account.
