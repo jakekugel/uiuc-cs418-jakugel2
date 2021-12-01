@@ -98,6 +98,7 @@ https://github.com/jakekugel/uiuc-cs418-jakugel2
 
         .logo {
             margin-left: 60px;
+            margin-top: 30px;
         }
 
         #myCanvas {
@@ -607,7 +608,7 @@ https://github.com/jakekugel/uiuc-cs418-jakugel2
                                 bondsInstanceSet.vertices.length / 3 * bondsInstanceSet.instances.length;
                 setFps("FPS: " + frames
                        + " / Triangles: " + triangles
-                       + " / Dimension: " + gl.canvas.clientWidth + "x"
+                       + " / Canvas size: " + gl.canvas.clientWidth + "x"
                        + gl.canvas.clientHeight);
                 frames = 0;
                 previous = now;
@@ -674,10 +675,6 @@ https://github.com/jakekugel/uiuc-cs418-jakugel2
           const clientWidth = gl.canvas.clientWidth;
           const clientHeight = gl.canvas.clientHeight;
           if (gl.canvas.width != clientWidth || gl.canvas.height != clientHeight) {
-              console.log("gl.canvas.clientWidth " + JSON.stringify(gl.canvas.clientWidth));
-              console.log("gl.canvas.clientHeight " + JSON.stringify(gl.canvas.clientHeight));
-              console.log("gl.canvas.width " + JSON.stringify(gl.canvas.width));
-              console.log("gl.canvas.height " + JSON.stringify(gl.canvas.height));
               gl.canvas.width = clientWidth;
               gl.canvas.height = clientHeight;
           }
