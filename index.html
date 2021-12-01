@@ -166,11 +166,12 @@ https://github.com/jakekugel/uiuc-cs418-jakugel2
           updateButton(name, 'nanotube', document.getElementById('buttonNanotube'));
 
           // Launch animation with new molecule
-          if (isMobileDevice()) {
-              displayError("Apologies, Web Molecule does not support mobile devices at this time.");
-          } else {
-              animateMolecule(name);
-          }
+          animateMolecule(name);
+          // if (isMobileDevice()) {
+          //     displayError("Apologies, Web Molecule does not support mobile devices at this time.");
+          // } else {
+          //     animateMolecule(name);
+          // }
       }
 
       function updateButton(newName, buttonName, element) {
@@ -468,11 +469,13 @@ https://github.com/jakekugel/uiuc-cs418-jakugel2
 
       // Called on initial page load
       function main() {
-          if (isMobileDevice()) {
-              displayError("Apologies, Web Molecule does not support mobile devices at this time.");
-          } else {
-              animateMolecule('water');
-          }
+          animateMolecule('water');
+
+          // if (isMobileDevice()) {
+          //     displayError("Apologies, Web Molecule does not support mobile devices at this time.");
+          // } else {
+          //     animateMolecule('water');
+          // }
       }
 
       function animateMolecule(name) {
