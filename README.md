@@ -2,9 +2,11 @@
 
 Web Molecule - Jake Kugel, 2021
 
-This page (visible [here](https://jakekugel.github.io/uiuc-cs418-jakugel2/)),
-displays 3-dimensional ball and stick models of various molecules.  It uses
-native browser WebGL2, and uses the following 3D graphics techniques:
+This web page displays 3-dimensional ball and stick model of various molecules.
+The web page can be viewed [here](https://jakekugel.github.io/uiuc-cs418-jakugel2/).
+
+This page was developed using WebGL2.  It demonstrates the following 3D graphics
+techniques:
 
 * **smooth per-pixel lighting** - shapes in scene show diffuse and specular
    lighting on per-pixel basis.
@@ -18,20 +20,20 @@ native browser WebGL2, and uses the following 3D graphics techniques:
     referencing different regions of grid on per-instance basis, also for
     higher performance.
 
-This page was developed by Jake Kugel as the final project for class CS-418 at
-the University of Illinois at Urbana-Champaign, taught by Professor John Hart,
-as part of the Online MCS program.
+This page was developed for the final project for class CS-418 at the University
+of Illinois at Urbana-Champaign, taught by Professor John Hart, as part of the
+Online MCS program.
 
 ## Credits
-Most concepts that were used to build this visualization came from UIUC CS-418
-and Prof. Hart.  This is an excellent class to learn modern interactive computer
-graphics.
+The graphics concepts that were used to build this demonstration came from UIUC
+CS-418 and Prof. Hart.  This is an excellent class to learn modern interactive
+computer graphics.
 
 This page also uses several WebGL2 techniques described in the very useful
 website https://webgl2fundamentals.org/.
 
-Thanks to my dad, Prof. Roger Kugel, for a conversation about covalent bonds and
-how to determine where bonds exist given a molecular 3D structure.
+Thanks to my dad, Prof. Roger Kugel, for a conversation about covalent bonds in
+molecules and how to determine where bonds exist given a molecular 3D structure.
 
 Thanks to my son, Eric Kugel, for a conversation about JavaScript best practices
 used in this page (or lack thereof).
@@ -63,17 +65,17 @@ copyright and license does not apply to these assets.
 
 **Boilerplate project cs418-fa21-project** - this repository began as a fork of
     an example project provided by Prof. Hart (https://github.com/jch-uiuc/cs418-fa21-project).
-    Although I am not aware of any fragments of the original boilerplate
-    index.html that remain in the current code, the sphere map
-    'stadium sphere.jpg' comes from this boilerplate project.  Also, the block
-    'I' logo in bumpmap.png was a modified version of the block 'I' in
+    Although I am not aware of any fragments of the original boilerplate code in
+    the HTML or JavaScript for this page, other assets are still used.  The
+    sphere map 'stadium sphere.jpg' comes from this boilerplate project.  Also,
+    the block 'I' logo in bumpmap.png was a modified version of the block 'I' in
     'illinois512.png' in the boilerplate project.
 
-**createDepthTexture() function** - this function was from the website
-    https://webgl2fundamentals.org/.
+**createDepthTexture() function** - this function in index.html was from the
+    website https://webgl2fundamentals.org/.
 
-**gl-matrix-min.js** - this open source linear algebra library was developed
-    by a third party.  See the script for authors and copyright.
+**gl-matrix-min.js** - this is an open source linear algebra library.  See the
+    See the script for authors and copyright.
 
 **webgl-debug.js** - this third-party library enables debugging console messages
     for webgl.  This script is a copyright of the The Khronos Group Inc.  A copy
