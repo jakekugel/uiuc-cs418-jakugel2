@@ -22,7 +22,7 @@ techniques:
 
 This page was developed for the final project for class CS-418 at the University
 of Illinois at Urbana-Champaign, taught by Professor John Hart, as part of the
-Online MCS program.
+[Online MCS](https://cs.illinois.edu/academics/graduate/professional-mcs/online-master-computer-science) program.
 
 ## Credits
 The graphics concepts that were used to build this demonstration came from UIUC
