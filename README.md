@@ -69,6 +69,9 @@ copyright and license does not apply to these assets.
     'I' logo in bumpmap.png was a modified version of the block 'I' in
     'illinois512.png' in the boilerplate project.
 
+**createDepthTexture() function** - this function was from the website
+    https://webgl2fundamentals.org/.
+
 **gl-matrix-min.js** - this open source linear algebra library was developed
     by a third party.  See the script for authors and copyright.
 
