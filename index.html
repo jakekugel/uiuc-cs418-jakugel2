@@ -2499,7 +2499,7 @@ https://github.com/jakekugel/uiuc-cs418-jakugel2
 
               // Homogeneous divide only done automatically for gl_Position, divide light coordinate here
               vec3 adjustedLightPosition = lightPosition.xyz / lightPosition.w;
-              float lightDepth = adjustedLightPosition.z + 0.0040; // bias
+              float lightDepth = adjustedLightPosition.z + 0.0042; // bias
 
               // Check if fragment is in light frustum
               bool inLight = adjustedLightPosition.x >= -1.0 &&
