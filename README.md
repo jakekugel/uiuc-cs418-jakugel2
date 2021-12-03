@@ -19,6 +19,9 @@ techniques:
 * **grid-based texture mapping** - storing multiple texture maps in a grid, and
     referencing different regions of grid on per-instance basis, also for
     higher performance.
+* **mobile device support** - the web page is functional on mobile devices,
+    the frame rate might not be as high as on a standard computer.
+
 
 This page was developed for the final project for class CS-418 at the University
 of Illinois at Urbana-Champaign, taught by Professor John Hart, as part of the
